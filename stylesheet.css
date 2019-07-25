@@ -1,0 +1,31 @@
+
+* {
+  white-space: nowrap;
+  margin: 0px;
+  padding: 0px;
+}
+
+
+body {
+  background-color: rgb(149, 142, 123);
+  text-align: center;
+}
+
+#defaultCanvas1 {
+  z-index: -100;
+  top: -50px;
+  left: 10px;
+}
+#defaultCanvas2 {
+  z-index: -100;
+  top: -50px;
+  left: -10px;
+}
+canvas {
+  position: relative;
+  top: 50px;
+  border-style: solid;
+  border-color: rgb(62, 58, 49);
+  border-width: 8px;
+  box-shadow: 5px 5px 15px 0px rgba(0,0,0,0.75);
+}
