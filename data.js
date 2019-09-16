@@ -1,6 +1,7 @@
 
 
 function setupData() {
+  // Setup extra images
   images = {
     "dice": {
       "6": [
@@ -15,16 +16,14 @@ function setupData() {
     }
   };
 
-
   // For local action params [showToken, complete, tokenRarity, token]
   // For other action params [tokenRarity, token]
-
-
+  // TokenData - (Name, Description, "rarity", -, -, -, -, image)
   tokensData = {
-    "neutral": { // Neutral
-      "common": [ // Common
+    "neutral": {
+      "common": [
         new TokenData(
-          "D8", "Roll a D8 and set all of your dice to its value.", "common",
+          "D8", "Roll a D8 and set all of your dice to its value.",
           false, false, function(params, callback) {
             screens[3].dice[0].diceSize = 8;
             screens[3].dice[0].reroll();
@@ -38,7 +37,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Equaliser", "For each of your dice if they are even half them, if they are odd double them.", "common",
+          "Equaliser", "For each of your dice if they are even half them, if they are odd double them.",
           false, false, function(params, callback) {
             for (let i = 0; i < screens[3].dice.length; i++) {
               if (screens[3].dice[i].value%2==0) {
@@ -53,7 +52,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Exponential", "Deal 15 to the enemies score, each time you use this multiply this amount by 1.1x.", "common",
+          "Exponential", "Deal 15 to the enemies score, each time you use this multiply this amount by 1.1x.",
           true, false, function(params, callback) {
             let damage = 15 * Math.pow(1.1, screens[3].extraInfo.exponentialUsed);
             params.push(damage);
@@ -69,7 +68,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Corrosive Goo", "Deal 10% of your current score total to enemy. For each goo you have this is increased by 15% Additive; Uses all the goo in your hand.", "common",
+          "Corrosive Goo", "Deal 10% of your current score total to enemy. For each goo you have this is increased by 15% Additive; Uses all the goo in your hand.",
           true, false, function(params, callback) {
             let count = 0;
             for (let i = 0; i < screens[3].tokens.length; i++) {
@@ -90,7 +89,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Heal", "Gain 15 to your score.", "common",
+          "Heal", "Gain 15 to your score.",
           false, true, function(params, callback) {
             screens[3].scoreInfo.scoreGained += 15;
             socket.emit("historySend", {"text": ("and gained " + 15), "formatting": {}});
@@ -100,7 +99,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Deal", "Deal 15 to the enemies score.", "common",
+          "Deal", "Deal 15 to the enemies score.",
           true, true, function(params, callback) {
             let damage = 15;
             params.push(damage);
@@ -111,7 +110,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Reroll", "Reroll all your dice.", "common",
+          "Reroll", "Reroll all your dice.",
           false, true, function(params, callback) {
             for (let i = 0; i < screens[3].dice.length; i++) {
               screens[3].dice[i].reroll(screens[3].dice[i].value);
@@ -122,7 +121,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Square", "Replace your roll with 2 d6s whose values are squared.", "common",
+          "Square", "Replace your roll with 2 d6s whose values are squared.",
           false, false, function(params, callback) {
             screens[3].dice = [];
             screens[3].generateDice(2, 6);
@@ -134,9 +133,9 @@ function setupData() {
           loadImage("Assets/Images/Tokens/Neutral/Common/Square.png")
         )
       ],
-      "rare": [ // Rare
+      "rare": [
         new TokenData(
-          "Interval", "For each dice become 3 * the interval (Minimum 1) between it and the next dice. This happens sequentially.", "rare",
+          "Interval", "For each dice become 3 * the interval (Minimum 1) between it and the next dice. This happens sequentially.",
           false, false, function(params, callback) {
             for (let i = 0; i < screens[3].dice.length-1; i++) {
               let val = abs(screens[3].dice[i+1].value-screens[3].dice[i].value);
@@ -149,7 +148,7 @@ function setupData() {
         ),
 
         // new TokenData(
-        //   "Joker", "Perform a random action of choice 6, onto a random player.", "rare",
+        //   "Joker", "Perform a random action of choice 6, onto a random player.",
         //   true, false, function(params, callback) {
         //     let r1 = floor(random(2));
         //     let r2 = floor(random(6));
@@ -210,7 +209,7 @@ function setupData() {
         // ),
 
         new TokenData(
-          "Mitosis", "Empty your roll and roll a d10, if it's an even roll, split into 2 D10s and roll again, keep repeating cycle until there are no even rolls.", "rare",
+          "Mitosis", "Empty your roll and roll a d10, if it's an even roll, split into 2 D10s and roll again, keep repeating cycle until there are no even rolls.",
           false, false, function(params, callback) {
             let toSplit = [];
             let splitCount = 0;
@@ -243,7 +242,7 @@ function setupData() {
 
 
         new TokenData(
-          "Ten Ten", "Roll a d10, and then set your roll to that many 10 valued d10s.", "rare",
+          "Ten Ten", "Roll a d10, and then set your roll to that many 10 valued d10s.",
           false, false, function(params, callback) {
             screens[3].dice = [];
             let amount = floor(random(10))+1;
@@ -256,7 +255,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Dead Mans Hand", "Reroll your tokens.", "rare",
+          "Dead Mans Hand", "Reroll your tokens.",
           false, true, function(params, callback) {
             for (let i = 0; i < screens[3].tokens.length; i++) {
               if (screens[3].tokens[i] != params[1]) {
@@ -270,7 +269,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Quartic", "Set the size of your first 4 dice to the square of their value, and reroll them.", "rare",
+          "Quartic", "Set the size of your first 4 dice to the square of their value, and reroll them.",
           false, false, function(params, callback) {
             for (let i = 0; i < min(4, screens[3].dice.length); i++) {
               screens[3].dice[i].diceSize = Math.pow(screens[3].dice[i].value, 2);
@@ -282,7 +281,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Pacify", "Block all incoming damage this turn. After 2 turns wilts into thorns.", "rare",
+          "Pacify", "Block all incoming damage this turn. After 2 turns wilts into thorns.",
           false, false, function(params, callback) {
             screens[3].extraInfo.blockDamage = true;
             callback(params);
@@ -290,9 +289,9 @@ function setupData() {
           loadImage("Assets/Images/Tokens/Neutral/Rare/Pacify.png")
         )
       ],
-      "legendary": [ // Legendary
+      "legendary": [
         new TokenData(
-          "Big Bertha", "Roll a d150, set this to your roll and deal 50% to the enemies score.", "legendary",
+          "Big Bertha", "Roll a d150, set this to your roll and deal 50% to the enemies score.",
           true, false, function(params, callback) {
             screens[3].dice = [new ShowDice(150, 0)];
             let damage = screens[3].dice[0].value * 0.5;
@@ -305,7 +304,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "50/50", "50% chance to gain 50% of your score, 50% chance to lose 50% of your score.", "legendary",
+          "50/50", "50% chance to gain 50% of your score, 50% chance to lose 50% of your score.",
           false, false, function(params, callback) {
             if (random() < 0.5) {
               screens[3].scoreInfo.scoreGained += screens[3].scoreInfo.score/2;
@@ -320,7 +319,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Gamble", "50% chance to take half of enemies score. 50% chance the enemy half takes of yours.", "legendary",
+          "Gamble", "50% chance to take half of enemies score. 50% chance the enemy half takes of yours.",
           true, false, function(params, callback) {
             params.push("outbound");
             if (random() < 0.5) { // Give 50% to enemy
@@ -352,12 +351,11 @@ function setupData() {
       ],
     },
 
-
-    "class": { // Class tokens
+    "class": {
       "one": {
         "common": [
           new TokenData(
-            "Blank", "When used sets itself, and any others, to token your topmost non Blank token.", "class",
+            "Blank", "When used sets itself, and any others, to token your topmost non Blank token.",
             false, true, function(params, callback) {
               let replaceToken = null;
               for (let i = 0; i < screens[3].tokens.length; i++) {
@@ -384,11 +382,10 @@ function setupData() {
         "legendary": []
       },
 
-
       "ogre": {
         "common": [
           new TokenData(
-            "Drumstick", "Deal 20 to their score, heal 20 to your score.", "common",
+            "Drumstick", "Deal 20 to their score, heal 20 to your score.",
             true, true, function(params, callback) {
               screens[3].scoreInfo.scoreGained += 20;
               screens[3].scoreInfo.scoreDealt += 20;
@@ -405,18 +402,17 @@ function setupData() {
         "legendary": []
       },
 
-
       "sniper": {
         "common": [
           new TokenData(
-            "Iris", "This is a token", "common",
+            "Iris", "This is a token",
             false, true, function(params, callback) {callback(params);}, function(params) {},
             loadImage("Assets/Images/Tokens/Class/Sniper/Iris.png")
           )
         ],
         "rare": [
           new TokenData(
-            "Precision", "Uses 75% stored power to deal 100% stored power to the enemy, with a 25% of critical hit, which multiplies output by 4x but uses all stored power.", "rare",
+            "Precision", "Uses 75% stored power to deal 100% stored power to the enemy, with a 25% of critical hit, which multiplies output by 4x but uses all stored power.",
             true, false, function(params, callback) {
               let damage = screens[3].extraInfo.sniperStoredDamage;
               let r1 = random();
@@ -440,11 +436,10 @@ function setupData() {
         "legendary": []
       },
 
-
       "theif": {
         "common": [
           new TokenData(
-            "Conspire", "This is a token", "common",
+            "Conspire", "This is a token",
             false, false, function(params, callback) {callback(params);}, function(params) {},
             loadImage("Assets/Images/Tokens/Class/Thief/Conspire.png")
           )
@@ -453,12 +448,11 @@ function setupData() {
         "legendary": []
       },
 
-
       "warlock": {
         "common": [],
         "rare": [
           new TokenData(
-            "Life Sap", "Discard 10% of his score to sap 20% of the enemy's.", "rare",
+            "Life Sap", "Discard 10% of his score to sap 20% of the enemy's.",
             true, false, function(params, callback) {
               let damage = screens[3].scoreInfo.score*0.1;
               screens[3].scoreInfo.scoreLost += damage;
@@ -487,10 +481,9 @@ function setupData() {
       }
     },
 
-
     "unobtainable": [
       new TokenData(
-        "Thorns", "Deal 15 damage to yourself", "common",
+        "Thorns", "Deal 15 damage to yourself",
         false, false, function(params, callback) {
           screens[3].scoreInfo.scoreLost += 15;
           callback(params);
@@ -500,8 +493,8 @@ function setupData() {
     ]
   }
 
-
-  classesData = [ // Needs) classId, name, description, custom tokens
+  // ClassData - (classID, name, description, custom tokens)
+  classesData = [
     new ClassData(
       "One",
       "One Trick depends on building for large, game-changing combos using his powerful class tokens.",
@@ -539,31 +532,43 @@ function setupData() {
     )
   ];
 
-
-  for (let [rarity, tokens] of Object.entries(tokensData.neutral)) { // For each rarity
-    for (let i = 0; i < tokens.length; i++) { // For each token
+  // For each token in each rarity in neutral - Set category/rarity/index, format description
+  for (let [rarity, tokens] of Object.entries(tokensData.neutral)) {
+    for (let i = 0; i < tokens.length; i++) {
       tokens[i].category = "neutral";
-      tokens[i].description = formatText(tokens[i].description, 35);
+      tokens[i].rarity = rarity;
       tokens[i].index = i;
+      tokens[i].description = formatText(tokens[i].description, 35);
     }
   }
 
-  for (let [clss, rarities] of Object.entries(tokensData.class)) { // For each class
-    for (let [rarity, tokens] of Object.entries(rarities)) { // For each rarity
-      for (let i = 0; i < tokens.length; i++) { // For each token
+  // For each token in each rarity in each class - Set category/rarity/index/class, format description
+  for (let [cls, rarities] of Object.entries(tokensData.class)) {
+    for (let [rarity, tokens] of Object.entries(rarities)) {
+      for (let i = 0; i < tokens.length; i++) {
         tokens[i].category = "class";
-        tokens[i].class = clss;
-        tokens[i].description = formatText(tokens[i].description, 35);
+        tokens[i].rarity = rarity;
         tokens[i].index = i;
+        tokens[i].class = cls;
+        tokens[i].description = formatText(tokens[i].description, 35);
       }
     }
   }
 
+  // For each token in unobtainable - Set category/index, format description
   for (let i = 0; i < tokensData.unobtainable.length; i++) {
     tokensData.unobtainable[i].category = "unobtainable";
-    tokensData.unobtainable[i].description = formatText(tokensData.unobtainable[i].description, 35);
     tokensData.unobtainable[i].index = i;
+    tokensData.unobtainable[i].description = formatText(tokensData.unobtainable[i].description, 35);
   }
+
+  // Setup colors
+  colors = {
+    "background": color(219, 199, 152),
+    "primary": color(167, 148, 129),
+    "secondary": color(62, 58, 49),
+    "tertiary": color(230, 220, 194)
+  };
 }
 
 
@@ -580,10 +585,12 @@ class ClassData {
 
 
 class TokenData {
-  constructor(name_, description_, rarity_, affectsEnemy_, partial_, action_, otherAction_, image_) {
+  constructor(name_, description_,
+  affectsEnemy_, partial_, action_, otherAction_, image_) {
+
     this.name = name_;
     this.description = description_;
-    this.rarity = rarity_;
+
     this.affectsEnemy = affectsEnemy_;
     this.partial = partial_;
     this.action = action_;
