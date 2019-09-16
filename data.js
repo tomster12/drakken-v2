@@ -543,7 +543,7 @@ function setupData() {
   for (let [rarity, tokens] of Object.entries(tokensData.neutral)) { // For each rarity
     for (let i = 0; i < tokens.length; i++) { // For each token
       tokens[i].category = "neutral";
-      tokens[i].description = formatText(tokens[i].description, 35);
+      tokens[i].description = formatTextCharacters(tokens[i].description, 35);
       tokens[i].index = i;
     }
   }
@@ -553,7 +553,7 @@ function setupData() {
       for (let i = 0; i < tokens.length; i++) { // For each token
         tokens[i].category = "class";
         tokens[i].class = clss;
-        tokens[i].description = formatText(tokens[i].description, 35);
+        tokens[i].description = formatTextCharacters(tokens[i].description, 35);
         tokens[i].index = i;
       }
     }
@@ -561,7 +561,7 @@ function setupData() {
 
   for (let i = 0; i < tokensData.unobtainable.length; i++) {
     tokensData.unobtainable[i].category = "unobtainable";
-    tokensData.unobtainable[i].description = formatText(tokensData.unobtainable[i].description, 35);
+    tokensData.unobtainable[i].description = formatTextCharacters(tokensData.unobtainable[i].description, 35);
     tokensData.unobtainable[i].index = i;
   }
 }
