@@ -6,9 +6,13 @@ let socket;
 function connectToServer() {
   socket = io.connect();
 
-  socket.on("gameConnectResponse", mainCanvasObj.screens[2].gameConnectResponse);
 
-  
+//   socket.on("historyReceive", function(data) {
+//     historyCanvas.historyReceive(data);
+//   });
+
+
+  socket.on("gameConnectResponse", (data) => {mainCanvas.screens[2].gameConnectResponse(data);});
 //   socket.on("gameStart", screens[3].gameStart);
 //   socket.on("gameTurn", screens[3].gameTurn);
 //   socket.on("gameTurnWin", function() {
@@ -26,26 +30,107 @@ function connectToServer() {
 //   });
 //
 //
-//   socket.on("chatReceiveMessage", function(data) {
-//     chatCanvasObj.receiveMessage(data, 0);
-//   });
-//   socket.on("chatUpdateData", function(data) {
-//     chatCanvasObj.chatUpdateData(data);
-//   });
-//
-//
-//   socket.on("historyReceive", function(data) {
-//     historyCanvasObj.historyReceive(data);
-//   });
+  socket.on("chatReceiveMessage", (data) => {chatCanvas.receiveMessage(data, 0)});
+  socket.on("chatUpdateData", (data) => {chatCanvas.chatUpdateData(data)});
 }
 
 // #endregion
 
 
 
+// #region - History Canvas
+
+function historyCanvasFunc(canvas) {
+
+  // #region - Setup
+
+  canvas.setup = function() {
+    // Setup p5 functions
+    canvas.createCanvas(300, 600);
+    canvas.textFont(fontBold);
+
+    // Setup variables
+    canvas.setupVariables();
+  }
+
+
+  canvas.setupVariables = function() {
+    // Setup variables
+    canvas.history = [];
+  }
+
+
+  // #endregion
+
+
+  // #region - Main
+
+  canvas.draw = function() {
+    // Setup main formatting
+    canvas.background(colors["tertiary"]);
+    canvas.noStroke();
+
+    // Show title
+    canvas.fill(colors["secondary"]);
+    canvas.textSize(45);
+    canvas.textAlign(LEFT);
+    canvas.text("History", 20, 50);
+    canvas.rect(0, 70, canvas.width, 2);
+
+    // Show history
+    let counter = 0;
+    for (let i = canvas.history.length - 1; i >= 0; i--) {
+      canvas.fill(canvas.history[i].formatting.color);
+      canvas.textSize(canvas.history[i].formatting.size);
+      canvas.text(formatTextCharacters(canvas.history[i].text, 27), 20, 100 + counter * 30);
+      counter += 1 + (canvas.history[i].text.split("\n").length - 1);
+      if (counter > 15) break;
+    }
+  }
+
+
+  canvas.historyReceive = function(data) {
+    // Receive a message from the server an place into list
+    canvas.history.push({
+      "text": data.text,
+      "formatting": {
+        "size": data.formatting.size != null ? data.formatting.size : 25,
+        "color":
+        data.formatting.color != null ? data.formatting.color
+        : (data.formatting.serverColor != null
+          ? color(data.formatting.serverColor[0], data.formatting.serverColor[1], data.formatting.serverColor[2])
+          : colors["secondary"])
+        }
+      });
+    }
+
+    // #endregion
+
+
+  // #region - Input
+
+    canvas.keyPressed = function() {}
+
+
+    canvas.mousePressed = function() {
+      if (insideCanvas(canvas)) {
+        focusCanvas(canvas);
+        console.log("Focused history");
+      }
+    }
+
+
+    canvas.mouseReleased = function() {}
+
+    // #endregion
+}
+
+// #endregion
+
+
 // #region - Main Canvas
 
-function mainCanvas(canvas) {
+function mainCanvasFunc(canvas) {
 
   // #region - Setup
 
@@ -57,20 +142,13 @@ function mainCanvas(canvas) {
     canvas.textSize(30);
     canvas.imageMode(CENTER);
 
-    // Setup screens
-    canvas.setupScreens();
-
     // Setup variables
     canvas.setupVariables();
   }
 
-
-  canvas.setupScreens = function() {
+  canvas.setupVariables = function() {
     // Setup screens
-    // #region - Screens
-
     canvas.screens = [
-
       // #region - Intro
       {
 
@@ -114,7 +192,7 @@ function mainCanvas(canvas) {
 
 
         mousePressed: function() {
-          this.canvas.currentScreen = 1;
+          this.canvas.changeToMenu(null);
         },
 
 
@@ -171,7 +249,7 @@ function mainCanvas(canvas) {
 
           // Additional setup
           for (let i = 0; i < classesData.length; i++)
-            this.classInfo.classList.push(new menuShowClass(this, classesData[i], i));
+          this.classInfo.classList.push(new menuShowClass(this, classesData[i], i));
           this.selectClass(0);
         },
 
@@ -213,71 +291,63 @@ function mainCanvas(canvas) {
             this.scrollInfo.indicatorPos,
             bPosXStart, bPosXEnd - iWidth, 0,
             this.classInfo.classList.length - 1);
-          let pos = this.scrollInfo.indicatorPos;
+            let pos = this.scrollInfo.indicatorPos;
 
-          // Draw scroll bar
-          this.canvas.noStroke();
-          this.canvas.fill(colors["tertiary"]);
-          this.canvas.ellipse(bPosXStart, bPosY, bSizeY, bSizeY);
-          this.canvas.ellipse(bPosXEnd, bPosY, bSizeY, bSizeY);
-          this.canvas.rect(bPosXStart, bPosY - bSizeY / 2, bPosXEnd - bPosXStart, bSizeY);
+            // Draw scroll bar
+            this.canvas.noStroke();
+            this.canvas.fill(colors["tertiary"]);
+            this.canvas.ellipse(bPosXStart, bPosY, bSizeY, bSizeY);
+            this.canvas.ellipse(bPosXEnd, bPosY, bSizeY, bSizeY);
+            this.canvas.rect(bPosXStart, bPosY - bSizeY / 2, bPosXEnd - bPosXStart, bSizeY);
 
-          // Draw scroll indicator
-          this.canvas.fill(255);
-          this.canvas.ellipse(pos, bPosY, bSizeY, bSizeY);
-          this.canvas.rect(pos, bPosY - bSizeY / 2, iWidth, bSizeY);
-          this.canvas.ellipse(pos + iWidth, bPosY, bSizeY, bSizeY);
+            // Draw scroll indicator
+            this.canvas.fill(255);
+            this.canvas.ellipse(pos, bPosY, bSizeY, bSizeY);
+            this.canvas.rect(pos, bPosY - bSizeY / 2, iWidth, bSizeY);
+            this.canvas.ellipse(pos + iWidth, bPosY, bSizeY, bSizeY);
 
-          // Update showClasses
-          for (let showClass of this.classInfo.classList)
+            // Update showClasses
+            for (let showClass of this.classInfo.classList)
             showClass.update();
 
-          // Show output text
-          if (this.outputTextInfo.text != null) {
-            let alpha = this.outputTextInfo.progress / this.outputTextInfo.time;
-            alpha = 255 * (1-Math.pow(alpha, 5));
-            this.canvas.noStroke();
-            alphaFill(this.canvas, colors["secondary"], alpha);
-            this.canvas.textFont(fontBold);
-            this.canvas.textSize(30);
-            this.canvas.text(this.outputTextInfo.text, this.canvas.width / 2, this.canvas.height - 200);
+            // Show output text
+            if (this.outputTextInfo.text != null) {
+              let alpha = this.outputTextInfo.progress / this.outputTextInfo.time;
+              alpha = 255 * (1-Math.pow(alpha, 5));
+              this.canvas.noStroke();
+              alphaFill(this.canvas, colors["secondary"], alpha);
+              this.canvas.textFont(fontBold);
+              this.canvas.textSize(30);
+              this.canvas.text(this.outputTextInfo.text, this.canvas.width / 2, this.canvas.height - 200);
 
-            // Update output text
-            this.outputTextInfo.progress++;
-            if (this.outputTextInfo.progress > this.outputTextInfo.time) {
-              this.outputTextInfo = {
-                "text": "",
-                "time": 0,
-                "progress": 0
-              };
+              // Update output text
+              this.outputTextInfo.progress++;
+              if (this.outputTextInfo.progress > this.outputTextInfo.time) {
+                this.outputTextInfo = {
+                  "text": "",
+                  "time": 0,
+                  "progress": 0
+                };
+              }
             }
-          }
 
-          // Show debug information
-          if (showDebug) {
-            this.canvas.noStroke();
-            this.canvas.fill(colors["secondary"]);
-            this.canvas.text("focused: " + (focusedCanvas == this.canvas), this.canvas.width * 0.15, 50);
-          }
-        },
+            // Show debug information
+            if (showDebug) {
+              this.canvas.noStroke();
+              this.canvas.fill(colors["secondary"]);
+              this.canvas.text("focused: " + (focusedCanvas == this.canvas), this.canvas.width * 0.15, 50);
+            }
+          },
 
 
-        // Select a showClass
-        selectClass: function(classIndex) {
-          for (let o = 0; o < this.classInfo.classList.length; o++)
+          // Select a showClass
+          selectClass: function(classIndex) {
+            for (let o = 0; o < this.classInfo.classList.length; o++)
             this.classInfo.classList[o].selected = (o == classIndex);
-          this.classInfo.classSelected = this.classInfo.classList[classIndex];
-        },
+            this.classInfo.classSelected = this.classInfo.classList[classIndex];
+          },
 
-
-        // Start the game
-        startGame: function() {
-          this.canvas.currentScreen = 2;
-          // this.canvas.screens[3].class = this.classInfo.classSelected.class;
-          this.canvas.screens[2].gameConnectRequest();
-        },
-
-        // #endregion
+          // #endregion
 
 
         // #region - Input
@@ -289,9 +359,10 @@ function mainCanvas(canvas) {
           // Pressed show class
           for (let i = 0; i < this.classInfo.classList.length; i++) {
             if (this.classInfo.classList[i].ontop()) {
-              if (this.classInfo.classList[i].selected)
-                this.startGame();
-              else this.selectClass(i);
+              if (this.classInfo.classList[i].selected) {
+                // this.canvas.screens[3].currentClass = ----;
+                this.canvas.connectToGame();
+              } else this.selectClass(i);
             }
           }
 
@@ -354,8 +425,8 @@ function mainCanvas(canvas) {
 
 
         gameConnectResponse: function(data) {
-          if (data.accepted) this.canvas.startGame(data.playerName);
-          else this.canvas.errorToMenu("could not connect", 60);
+          if (data.accepted) this.canvas.startGame(data.playerNum);
+          else this.canvas.changeToMenu({"text": "could not connect", "time": 60, "progress": 0});
         },
 
         // #endregion
@@ -582,7 +653,7 @@ function mainCanvas(canvas) {
       //       "time": 60,
       //       "progress": 0
       //     };
-      //     historyCanvasObj.history = [];
+      //     historyCanvas.history = [];
       //   }
       //
       //
@@ -930,13 +1001,8 @@ function mainCanvas(canvas) {
       // // #endregion
 
       // #endregion
-    ];
+    ]
 
-    // #endregion
-  }
-
-
-  canvas.setupVariables = function() {
     // Setup variables
     for (let screen of canvas.screens)
       screen.initialize(canvas);
@@ -956,15 +1022,28 @@ function mainCanvas(canvas) {
   }
 
 
+  canvas.connectToGame = function() {
+    // Change to connection screen and connect
+    canvas.currentScreen = 2;
+    canvas.screens[2].gameConnectRequest();
+  }
+
+
   canvas.startGame = function(playerNum) {
     // Start the game as player playerNum
     console.log("starting game, player " + playerNum);
   }
 
 
-  canvas.errorToMenu = function(errorData, errorTime) {
-    // Change back to menu with error
-    console.log("Error, changing to menu " + errorData + ", " + errorTime);
+  canvas.changeToMenu = function(information) {
+    // Log errors to console
+    if (information != null) {
+      console.log("changing to menu " + information.text + ", " + information.time);
+      canvas.screens[1].outputTextInfo = information;
+    } else console.log("changing to menu");
+
+    // Change to menu
+    canvas.currentScreen = 1;
   }
 
   // #endregion
@@ -1001,99 +1080,9 @@ function mainCanvas(canvas) {
 // #endregion
 
 
-// #region - History Canvas
-
-function historyCanvas(canvas) {
-
-  // #region - Setup
-
-  canvas.setup = function() {
-    // Setup p5 functions
-    canvas.createCanvas(300, 600);
-    canvas.textFont(fontBold);
-
-    // Setup variables
-    canvas.setupVariables();
-  }
-
-
-  canvas.setupVariables = function() {
-    // Setup variables
-    canvas.history = [];
-  }
-
-
-  // #endregion
-
-
-  // #region - Main
-
-  canvas.draw = function() {
-    // Setup main formatting
-    canvas.background(colors["tertiary"]);
-    canvas.noStroke();
-
-    // Show title
-    canvas.fill(colors["secondary"]);
-    canvas.textSize(45);
-    canvas.textAlign(LEFT);
-    canvas.text("History", 20, 50);
-    canvas.rect(0, 70, canvas.width, 2);
-
-    // Show history
-    let counter = 0;
-    for (let i = canvas.history.length - 1; i >= 0; i--) {
-      canvas.fill(canvas.history[i].formatting.color);
-      canvas.textSize(canvas.history[i].formatting.size);
-      canvas.text(formatTextCharacters(canvas.history[i].text, 27), 20, 100 + counter * 30);
-      counter += 1 + (canvas.history[i].text.split("\n").length - 1);
-      if (counter > 15) break;
-    }
-  }
-
-
-  canvas.historyReceive = function(data) {
-    // Receive a message from the server an place into list
-    canvas.history.push({
-      "text": data.text,
-      "formatting": {
-        "size": data.formatting.size != null ? data.formatting.size : 25,
-        "color":
-          data.formatting.color != null ? data.formatting.color
-          : (data.formatting.serverColor != null
-          ? color(data.formatting.serverColor[0], data.formatting.serverColor[1], data.formatting.serverColor[2])
-          : colors["secondary"])
-      }
-    });
-  }
-
-  // #endregion
-
-
-  // #region - Input
-
-  canvas.keyPressed = function() {}
-
-
-  canvas.mousePressed = function() {
-    if (insideCanvas(canvas)) {
-      focusCanvas(canvas);
-      console.log("Focused history");
-    }
-  }
-
-
-  canvas.mouseReleased = function() {}
-
-  // #endregion
-}
-
-// #endregion
-
-
 // #region - Chat Canvas
 
-function chatCanvas(canvas) {
+function chatCanvasFunc(canvas) {
 
   // #region - Setup
 
@@ -1114,23 +1103,29 @@ function chatCanvas(canvas) {
 
   canvas.setupVariables = function() {
     // Setup variables
-    canvas.deleteTimer = 0;
     canvas.chatInfo = {
       "connected": true,
       "nickname": "",
       "chatColor": null,
       "messages": [],
+      "deleteTimer": 0,
 
-      "boxPos": {"x": 50, "y": canvas.height-32},
-      "boxSize": {"x": 240, "y": 20},
-      "boxFocused": false,
-      "boxCurrent": "",
+      "box": {
+        "pos": {"x": 50, "y": canvas.height-32},
+        "box.size": {"x": 240, "y": 20},
+        "focused": false,
+        "current": "",
+      },
 
-      "chatAnmTime": 0,
-      "chatAnmTog": false,
+      "cursorAnm": {
+        "time": 0,
+        "toggle": false
+      },
 
-      "colPos": {"x": 20, "y": canvas.height-32},
-      "colSize": {"x": 20, "y": 20}
+      "col": {
+        "pos": {"x": 20, "y": canvas.height-32},
+        "size": {"x": 20, "y": 20}
+      }
     };
   }
 
@@ -1141,19 +1136,23 @@ function chatCanvas(canvas) {
 
   canvas.draw = function() {
     // Update chat deletion
-    if (canvas.deleteTimer > 0) canvas.deleteTimer--;
-    if (keyIsDown(8) && canvas.chatInfo.boxFocused && canvas.deleteTimer == 0) {
-      canvas.chatInfo.boxCurrent = canvas.chatInfo.boxCurrent.slice(0, canvas.chatInfo.boxCurrent.length-1);
-      canvas.deleteTimer = 5;
+    if (canvas.chatInfo.deleteTimer > 0) canvas.chatInfo.deleteTimer--;
+    if (keyIsDown(8) && canvas.chatInfo.box.focused && canvas.chatInfo.deleteTimer == 0) {
+      canvas.chatInfo.box.current = canvas.chatInfo.box.current.slice(0, canvas.chatInfo.box.current.length - 1);
+      canvas.delete.chatInfo.timer = 5;
     }
 
+    // Main formatting
     canvas.background(colors["tertiary"]);
+
+    // Show title
     canvas.noStroke();
     canvas.fill(colors["secondary"]);
-
-    canvas.textSize(45); // Show chat title
-    canvas.text("Chat", canvas.width-20, 50);
+    canvas.textSize(45);
+    canvas.text("Chat", canvas.width - 20, 50);
     canvas.rect(0, 70, canvas.width, 2);
+
+    // Show nickname
     if (canvas.chatInfo.nickname != "") {
       canvas.fill(canvas.chatInfo.chatColor);
       canvas.textAlign(LEFT);
@@ -1162,41 +1161,47 @@ function chatCanvas(canvas) {
       canvas.textAlign(RIGHT);
     }
 
-    canvas.textSize(25); // Show chat messages
+    // Show chat messages
+    canvas.textSize(25);
     let counter = 0;
-    for (let i = canvas.chatInfo.messages.length-1; i >= 0; i--) {
+    for (let i = canvas.chatInfo.messages.length - 1; i >= 0; i--) {
+      let textToShow = formatTextCharacters(canvas.chatInfo.messages[i].message, 20);
       canvas.fill(canvas.chatInfo.messages[i].chatColor);
-      canvas.text(canvas.chatInfo.messages[i].message, canvas.width-15, 100 + counter*30);
-      counter += 1 + (canvas.chatInfo.messages[i].message.split("\n").length - 1);
+      canvas.text(textToShow, canvas.width - 15, 100 + counter * 30);
+      counter += 1 + (textToShow.split("\n").length - 1);
     }
 
-    canvas.rect(0, canvas.height-62, canvas.width, 2); // Show chat box
+    // Show chat box
+    canvas.rect(0, canvas.height - 62, canvas.width, 2);
     canvas.fill(colors["primary"]);
-    canvas.rect(0, canvas.height-60, canvas.width, 60);
+    canvas.rect(0, canvas.height - 60, canvas.width, 60);
     canvas.fill(colors["tertiary"]);
     canvas.rect(
-      canvas.chatInfo.boxPos.x-8,
-      canvas.chatInfo.boxPos.y-8,
-      canvas.chatInfo.boxSize.x,
-      canvas.chatInfo.boxSize.y
+      canvas.chatInfo.box.pos.x-8,
+      canvas.chatInfo.box.pos.y-8,
+      canvas.chatInfo.box.size.x,
+      canvas.chatInfo.box.size.y
     );
 
-    canvas.textSize(16); // Show box text
+    // Show box text
+    canvas.textSize(16);
     canvas.fill(colors["secondary"]);
     canvas.text(
       canvas.chatInfo.boxCurrent,
-      canvas.chatInfo.boxPos.x+canvas.chatInfo.boxSize.x-15,
-      canvas.chatInfo.boxPos.y+canvas.chatInfo.boxSize.y-12
+      canvas.chatInfo.box.pos.x+canvas.chatInfo.box.size.x-15,
+      canvas.chatInfo.box.pos.y+canvas.chatInfo.box.size.y-12
     );
 
-    canvas.fill(colors["primary"]); // Cover unneeded box text
+    // Cover unneeded box text
+    canvas.fill(colors["primary"]);
     canvas.rect(
-      canvas.chatInfo.boxPos.x-40-8,
-      canvas.chatInfo.boxPos.y-8,
+      canvas.chatInfo.box.pos.x - 40 - 8,
+      canvas.chatInfo.box.pos.y - 8,
       40,
-      canvas.chatInfo.boxSize.y
+      canvas.chatInfo.box.size.y
     );
 
+    // Show color change request
     canvas.fill(255);
     canvas.rect(
       canvas.chatInfo.colPos.x-8,
@@ -1205,27 +1210,29 @@ function chatCanvas(canvas) {
       canvas.chatInfo.colSize.y
     );
 
-    if (canvas.chatInfo.boxFocused) { // Show chat selected
-      if (canvas.chatInfo.chatAnmTog) {
+    // Show chat selected
+    if (canvas.chatInfo.boxFocused) {
+      if (canvas.chatInfo.cursorAnm.toggle) {
         canvas.fill(colors["secondary"]);
         canvas.rect(
-          canvas.chatInfo.boxPos.x+canvas.chatInfo.boxSize.x-8-4,
-          canvas.chatInfo.boxPos.y-8+2,
+          canvas.chatInfo.box.pos.x + canvas.chatInfo.box.size.x - 8 - 4,
+          canvas.chatInfo.box.pos.y - 8 + 2,
           2,
-          canvas.chatInfo.boxSize.y-4
+          canvas.chatInfo.box.size.y - 4
         );
       }
-      canvas.chatInfo.chatAnmTime--;
-      if (canvas.chatInfo.chatAnmTime < 0) {
-        canvas.chatInfo.chatAnmTime = 20;
-        canvas.chatInfo.chatAnmTog = !canvas.chatInfo.chatAnmTog;
+      canvas.chatInfo.cursorAnm.time--;
+      if (canvas.chatInfo.cursorAnm.time < 0) {
+        canvas.chatInfo.cursorAnm.time = canvas.chatInfo.cursorAnm.timeMax;
+        canvas.chatInfo.cursorAnm.toggle = !canvas.chatInfo.cursorAnm.toggle;
       }
     }
 
+    // Debug
     if (showDebug) {
-      canvas.fill(colors["secondary"]); // Debug
-      canvas.text("Focused: " + (focusedCanvas == canvas), canvas.width*0.65, 35);
-      canvas.text("Chat Focused: " + canvas.chatInfo.boxFocused, canvas.width*0.65, 60);
+      canvas.fill(colors["secondary"]);
+      canvas.text("Focused: " + (focusedCanvas == canvas), canvas.width * 0.65, 35);
+      canvas.text("Chat Focused: " + canvas.chatInfo.box.focused, canvas.width * 0.65, 60);
     }
   }
 
@@ -1291,8 +1298,8 @@ function chatCanvas(canvas) {
 
       // Type character upper / lower case using shift
       } else if (keyCode >= 65 && keyCode <= 90 || keyCode == 32) {
-        if (keyIsDown(16)) canvas.chatInfo.boxCurrent += key;
-        else canvas.chatInfo.boxCurrent += key.toLowerCase();
+        if (keyIsDown(16)) canvas.chatInfo.box.current += key;
+        else canvas.chatInfo.box.current += key.toLowerCase();
       }
     }
   }
@@ -1305,10 +1312,10 @@ function chatCanvas(canvas) {
 
       // Focus chat box
       canvas.chatInfo.boxFocused = (
-        canvas.mouseX > canvas.chatInfo.boxPos.x
-        && canvas.mouseX < (canvas.chatInfo.boxPos.x+canvas.chatInfo.boxSize.x)
-        && canvas.mouseY > canvas.chatInfo.boxPos.y
-        && canvas.mouseY < (canvas.chatInfo.boxPos.y+canvas.chatInfo.boxSize.y)
+        canvas.mouseX > canvas.chatInfo.box.pos.x
+        && canvas.mouseX < (canvas.chatInfo.box.pos.x+canvas.chatInfo.box.size.x)
+        && canvas.mouseY > canvas.chatInfo.box.pos.y
+        && canvas.mouseY < (canvas.chatInfo.box.pos.y+canvas.chatInfo.box.size.y)
       );
 
       // Request color change
@@ -1337,9 +1344,9 @@ function chatCanvas(canvas) {
 // #region - Setup
 
 // Canvases
-let historyCanvasObj;
-let mainCanvasObj;
-let chatCanvasObj;
+let historyCanvas;
+let mainCanvas;
+let chatCanvas;
 let canvases;
 let focusedCanvas;
 
@@ -1379,13 +1386,13 @@ function preload() {
 
 function setup() {
   // Setup canvases
-  historyCanvasObj = new p5(historyCanvas, "canvasContainer");
-  mainCanvasObj = new p5(mainCanvas, "canvasContainer");
-  chatCanvasObj = new p5(chatCanvas, "canvasContainer");
+  historyCanvas = new p5(historyCanvasFunc, "canvasContainer");
+  mainCanvas = new p5(mainCanvasFunc, "canvasContainer");
+  chatCanvas = new p5(chatCanvasFunc, "canvasContainer");
   canvases = [
-    historyCanvasObj,
-    mainCanvasObj,
-    chatCanvasObj
+    historyCanvas,
+    mainCanvas,
+    chatCanvas
   ];
   focusedCanvas = null;
 
@@ -1570,14 +1577,22 @@ class menuShowClass {
     this.menu.canvas.image(this.class.tokens[0].image, this.px, this.py, this.size, this.size);
     this.menu.canvas.noTint();
 
-    // If ontop and selected show "Play!"
-    if (this.ontop()) {
-      this.menu.canvas.textSize(30);
-      if (this.selected) {
+    // If ontop or selected show name
+    if (this.ontop() || this.selected) {
+      this.menu.canvas.noStroke();
+      alphaFill(this.menu.canvas, colors["secondary"], alpha);
+      this.menu.canvas.textSize(40);
+      this.menu.canvas.text(this.class["name"], this.px, this.py - this.size*0.5 -10 -(this.selected?5:0));
+    }
+
+    if (this.selected) {
+      if (this.ontop()) {
+        // If ontop and selected show white fade ontop
         this.menu.canvas.noStroke();
         this.menu.canvas.fill(255, 60);
         this.menu.canvas.ellipse(this.px, this.py, this.size, this.size);
 
+        // If ontop and selected show "Play!"
         this.menu.canvas.strokeWeight(2);
         this.menu.canvas.stroke(colors["secondary"]);
         this.menu.canvas.fill(colors["tertiary"]);
@@ -1585,22 +1600,7 @@ class menuShowClass {
         this.menu.canvas.text("Play!", this.px, this.py + 10);
       }
 
-      // If ontop show name
-      this.menu.canvas.noStroke();
-      alphaFill(this.menu.canvas, colors["secondary"], alpha);
-      this.menu.canvas.text(this.class["name"], this.px, this.py - this.size*0.5 -10 -(this.selected?5:0));
-    }
-
-    // Show alpha when debugging
-    if (showDebug) {
-      this.menu.canvas.noStroke();
-      this.menu.canvas.fill(0);
-      this.menu.canvas.textSize(15);
-      this.menu.canvas.text(nf(abs(this.index - this.menu.scrollInfo.scrollProgress), 1, 1), this.px, this.py+5);
-    }
-
-    // Show class name
-    if (this.selected) {
+      // Show class name
       this.menu.canvas.noStroke();
       this.menu.canvas.fill(colors["secondary"]);
       this.menu.canvas.textSize(50);
@@ -1624,6 +1624,14 @@ class menuShowClass {
         let py = 80 + (i + 0.35) *  interval;
         this.menu.canvas.image(this.class.tokens[i].image, px, py, size, size);
       }
+    }
+
+    // Show alpha when debugging
+    if (showDebug) {
+      this.menu.canvas.noStroke();
+      this.menu.canvas.fill(0);
+      this.menu.canvas.textSize(15);
+      this.menu.canvas.text(nf(abs(this.index - this.menu.scrollInfo.scrollProgress), 1, 1), this.px, this.py+5);
     }
   }
 
