@@ -2,19 +2,15 @@
 
 // #region - Socket Functions
 
-// let socket;
-// function connectToServer() {
-//   socket = io.connect();
-//
-//   socket.on("gameConnectResponse", function(data) {
-//     screens[2].gameConnectResponse(data);
-//   });
-//   socket.on("gameStart", function(data) {
-//     screens[3].gameStart();
-//   });
-//   socket.on("gameTurn", function(data) {
-//     screens[3].gameTurn(data);
-//   });
+let socket;
+function connectToServer() {
+  socket = io.connect();
+
+  socket.on("gameConnectResponse", mainCanvasObj.screens[2].gameConnectResponse);
+
+  
+//   socket.on("gameStart", screens[3].gameStart);
+//   socket.on("gameTurn", screens[3].gameTurn);
 //   socket.on("gameTurnWin", function() {
 //     screens[3].scoreInfo.score += 10;
 //     screens[3].gameScoreUpdateSend("update");
@@ -41,7 +37,7 @@
 //   socket.on("historyReceive", function(data) {
 //     historyCanvasObj.historyReceive(data);
 //   });
-// }
+}
 
 // #endregion
 
@@ -276,9 +272,9 @@ function mainCanvas(canvas) {
 
         // Start the game
         startGame: function() {
+          this.canvas.currentScreen = 2;
           // this.canvas.screens[3].class = this.classInfo.classSelected.class;
-          // currentScreen = 2;
-          // screens[2].connectRequest();
+          this.canvas.screens[2].gameConnectRequest();
         },
 
         // #endregion
@@ -326,63 +322,54 @@ function mainCanvas(canvas) {
 
 
       // #region - Connect
+      {
 
-      // class ConnectScreen {
-      //   // #region - Setup
-      //
-      //   constructor() {
-      //     this.resetVariables();
-      //   }
-      //   resetVariables() {}
-      //
-      //   // #endregion
-      //
-      //
-      //   // #region - Main
-      //
-      //   connectRequest() {
-      //     socket.emit("gameConnectRequest");
-      //   }
-      //
-      //
-      //   gameConnectResponse(data) {
-      //     if (data.accepted) {
-      //       currentScreen = 3;
-      //       screens[3].resetVariables();
-      //       screens[3].playerName = data.name;
-      //       screens[3].class = screens[1].classInfo.classSelected.class;;
-      //
-      //     } else {
-      //       currentScreen = 1;
-      //       screens[1].outputTextInfo = {
-      //         "text": "Could not connect",
-      //         "time": 60,
-      //         "progress": 0
-      //       }
-      //     }
-      //   }
-      //
-      //
-      //   update() {
-      //     background(colors["background"]);
-      //     noStroke();
-      //     fill(colors["secondary"]);
-      //     textSize(40);
-      //     text("Connecting...", width/2, height/2 + 40/3);
-      //   }
-      //
-      //   // #endregion
-      //
-      //
-      //   // #region - Input
-      //
-      //   keyPressed() {}
-      //   mousePressed() {}
-      //   mouseReleased() {}
-      //
-      //   // #endregion
-      // }
+        // #region - Setup
 
+        initialize: function(canvas) {
+          this.canvas = canvas;
+          this.setupVariables();
+        },
+
+
+        setupVariables: function() {},
+
+        // #endregion
+
+
+        // #region - Main
+
+        update: function() {
+          this.canvas.background(colors["background"]);
+          this.canvas.noStroke();
+          this.canvas.fill(colors["secondary"]);
+          this.canvas.textSize(40);
+          this.canvas.text("Connecting...", this.canvas.width / 2, this.canvas.height / 2 + 40 / 3);
+        },
+
+
+        gameConnectRequest: function() {
+          socket.emit("gameConnectRequest");
+        },
+
+
+        gameConnectResponse: function(data) {
+          if (data.accepted) this.canvas.startGame(data.playerName);
+          else this.canvas.errorToMenu("could not connect", 60);
+        },
+
+        // #endregion
+
+
+        // #region - Input
+
+        keyPressed: function() {},
+        mousePressed: function() {},
+        mouseReleased: function() {}
+
+        // #endregion
+
+      },
       // #endregion
 
 
@@ -968,6 +955,18 @@ function mainCanvas(canvas) {
     canvas.screens[canvas.currentScreen].update();
   }
 
+
+  canvas.startGame = function(playerNum) {
+    // Start the game as player playerNum
+    console.log("starting game, player " + playerNum);
+  }
+
+
+  canvas.errorToMenu = function(errorData, errorTime) {
+    // Change back to menu with error
+    console.log("Error, changing to menu " + errorData + ", " + errorTime);
+  }
+
   // #endregion
 
 
@@ -1395,7 +1394,7 @@ function setup() {
   defaultCanv.parentNode.removeChild(defaultCanv);
 
   // Connect to game server
-  // connectToServer();
+  connectToServer();
 }
 
 // #endregion

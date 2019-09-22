@@ -122,19 +122,7 @@ io.sockets.on("connection", function (socket) {
 
     // #region - Game
 
-    socket.on("gameConnectRequest", function() {
-      socket.emit("gameConnectResponse", {"accepted": playerCount<2, "name": playerCount==0?"Player 1":"Player 2"});
-
-      if (playerCount < 2) {
-        console.log("Player connected: " + socket.id);
-        players[playerCount] = socket;
-        playerCount++;
-        if (playerCount == 2) gameStart();
-
-      } else {
-        console.log("Player declined: " + socket.id + " ("+playerCount+")");
-      }
-    });
+    socket.on("gameConnectRequest", gameConnectRequest);
 
 
     socket.on("gameLockin", function() {
@@ -182,12 +170,30 @@ io.sockets.on("connection", function (socket) {
   }
 );
 
+// #endregion
+
 
 function historySend(data) {
   players[0].emit("historyReceive", data);
   players[1].emit("historyReceive", data);
 }
 
+
+// #region - Game
+
+function gameConnectRequest() {
+  socket.emit("gameConnectResponse", {"accepted": playerCount<2, "name": playerCount==0?"Player 1":"Player 2"});
+
+  if (playerCount < 2) {
+    console.log("Player connected: " + socket.id);
+    players[playerCount] = socket;
+    playerCount++;
+    if (playerCount == 2) gameStart();
+
+  } else {
+    console.log("Player declined: " + socket.id + " ("+playerCount+")");
+  }
+}
 
 function gameStart() {
   lockCount = 0;
