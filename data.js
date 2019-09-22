@@ -538,7 +538,6 @@ function setupData() {
       tokens[i].category = "neutral";
       tokens[i].rarity = rarity;
       tokens[i].index = i;
-      tokens[i].description = formatText(tokens[i].description, 35);
     }
   }
 
@@ -550,7 +549,6 @@ function setupData() {
         tokens[i].rarity = rarity;
         tokens[i].index = i;
         tokens[i].class = cls;
-        tokens[i].description = formatText(tokens[i].description, 35);
       }
     }
   }
@@ -559,7 +557,6 @@ function setupData() {
   for (let i = 0; i < tokensData.unobtainable.length; i++) {
     tokensData.unobtainable[i].category = "unobtainable";
     tokensData.unobtainable[i].index = i;
-    tokensData.unobtainable[i].description = formatText(tokensData.unobtainable[i].description, 35);
   }
 
   // Setup colors
