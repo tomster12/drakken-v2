@@ -1,5 +1,17 @@
 
 
+//      TODO
+//  Additional formatting to chat messages
+//  Better system to split text based on width
+//    that instead splits at the start of words and
+//    uses the width of each character to calculate
+//  Finish cleaning up and implementing the game screen
+//  Fully redo how the tokens send actions over to tell
+//    the other client to perform a certain action
+// Create more targeted random for random color for chat
+// Update history to use a round based system
+
+
 // #region - Socket Functions
 
 let socket;
@@ -7,9 +19,7 @@ function connectToServer() {
   socket = io.connect();
 
 
-//   socket.on("historyReceive", function(data) {
-//     historyCanvas.historyReceive(data);
-//   });
+  socket.on("historyReceive", (data) => {historyCanvas.receive(data);});
 
 
   socket.on("gameConnectResponse", (data) => {mainCanvas.screens[2].gameConnectResponse(data);});
@@ -30,8 +40,8 @@ function connectToServer() {
 //   });
 //
 //
-  socket.on("chatReceiveMessage", (data) => {chatCanvas.receiveMessage(data, 0)});
-  socket.on("chatUpdateData", (data) => {chatCanvas.chatUpdateData(data)});
+  socket.on("chatReceiveMessage", (data) => {chatCanvas.receiveMessage(data)});
+  socket.on("chatUpdateData", (data) => {chatCanvas.updateData(data)});
 }
 
 // #endregion
@@ -80,16 +90,17 @@ function historyCanvasFunc(canvas) {
     // Show history
     let counter = 0;
     for (let i = canvas.history.length - 1; i >= 0; i--) {
+      let textToShow = formatTextWidth(canvas.history[i].text, 300, canvas);
       canvas.fill(canvas.history[i].formatting.color);
       canvas.textSize(canvas.history[i].formatting.size);
-      canvas.text(formatTextCharacters(canvas.history[i].text, 27), 20, 100 + counter * 30);
-      counter += 1 + (canvas.history[i].text.split("\n").length - 1);
+      canvas.text(textToShow, 20, 100 + counter * 30);
+      counter += 2 + (textToShow.split("\n").length - 1);
       if (counter > 15) break;
     }
   }
 
 
-  canvas.historyReceive = function(data) {
+  canvas.receive = function(data) {
     // Receive a message from the server an place into list
     canvas.history.push({
       "text": data.text,
@@ -109,7 +120,8 @@ function historyCanvasFunc(canvas) {
 
   // #region - Input
 
-    canvas.keyPressed = function() {}
+    canvas.keyPressed = function() {
+    }
 
 
     canvas.mousePressed = function() {
@@ -1095,9 +1107,13 @@ function chatCanvasFunc(canvas) {
     // Setup variables
     canvas.setupVariables();
     canvas.receiveMessage({
-      "message": "Enter your nickname and send to join the chat.",
-      "chatColor": null
-    }, 1);
+      "message": "Enter a nickname to join chat!.",
+      "formatting": {
+        "size": 30,
+        "bold": true,
+        "color": null
+      }
+    });
   }
 
 
@@ -1112,13 +1128,14 @@ function chatCanvasFunc(canvas) {
 
       "box": {
         "pos": {"x": 50, "y": canvas.height-32},
-        "box.size": {"x": 240, "y": 20},
+        "size": {"x": 240, "y": 20},
         "focused": false,
         "current": "",
       },
 
       "cursorAnm": {
         "time": 0,
+        "timeMax": 20,
         "toggle": false
       },
 
@@ -1139,14 +1156,29 @@ function chatCanvasFunc(canvas) {
     if (canvas.chatInfo.deleteTimer > 0) canvas.chatInfo.deleteTimer--;
     if (keyIsDown(8) && canvas.chatInfo.box.focused && canvas.chatInfo.deleteTimer == 0) {
       canvas.chatInfo.box.current = canvas.chatInfo.box.current.slice(0, canvas.chatInfo.box.current.length - 1);
-      canvas.delete.chatInfo.timer = 5;
+      canvas.chatInfo.deleteTimer = 5;
     }
 
     // Main formatting
     canvas.background(colors["tertiary"]);
 
+    // Show chat messages
+    canvas.textSize(25);
+    let offsetCounter = 0, messageCounter = 0;
+    for (let i = canvas.chatInfo.messages.length - 1; i >= 0; i--) {
+      let textToShow = formatTextWidth(canvas.chatInfo.messages[i].message, 220, canvas);
+      canvas.textSize(canvas.chatInfo.messages[i].formatting.size);
+      offsetCounter += 1 + (textToShow.split("\n").length - 1);
+      canvas.fill(canvas.chatInfo.messages[i].formatting.color);
+      canvas.textFont(canvas.chatInfo.messages[i].formatting["bold"] ? fontBold : fontRegular);
+      canvas.text(textToShow, canvas.width - 15, canvas.height - 40 - offsetCounter * 30 - messageCounter * 20);
+      messageCounter++;
+    }
+
     // Show title
     canvas.noStroke();
+    canvas.fill(colors["tertiary"]);
+    canvas.rect(0, 0, canvas.width, 70);
     canvas.fill(colors["secondary"]);
     canvas.textSize(45);
     canvas.text("Chat", canvas.width - 20, 50);
@@ -1161,17 +1193,8 @@ function chatCanvasFunc(canvas) {
       canvas.textAlign(RIGHT);
     }
 
-    // Show chat messages
-    canvas.textSize(25);
-    let counter = 0;
-    for (let i = canvas.chatInfo.messages.length - 1; i >= 0; i--) {
-      let textToShow = formatTextCharacters(canvas.chatInfo.messages[i].message, 20);
-      canvas.fill(canvas.chatInfo.messages[i].chatColor);
-      canvas.text(textToShow, canvas.width - 15, 100 + counter * 30);
-      counter += 1 + (textToShow.split("\n").length - 1);
-    }
-
     // Show chat box
+    canvas.fill(colors["secondary"]);
     canvas.rect(0, canvas.height - 62, canvas.width, 2);
     canvas.fill(colors["primary"]);
     canvas.rect(0, canvas.height - 60, canvas.width, 60);
@@ -1187,7 +1210,7 @@ function chatCanvasFunc(canvas) {
     canvas.textSize(16);
     canvas.fill(colors["secondary"]);
     canvas.text(
-      canvas.chatInfo.boxCurrent,
+      canvas.chatInfo.box.current,
       canvas.chatInfo.box.pos.x+canvas.chatInfo.box.size.x-15,
       canvas.chatInfo.box.pos.y+canvas.chatInfo.box.size.y-12
     );
@@ -1204,23 +1227,24 @@ function chatCanvasFunc(canvas) {
     // Show color change request
     canvas.fill(255);
     canvas.rect(
-      canvas.chatInfo.colPos.x-8,
-      canvas.chatInfo.colPos.y-8,
-      canvas.chatInfo.colSize.x,
-      canvas.chatInfo.colSize.y
+      canvas.chatInfo.col.pos.x-8,
+      canvas.chatInfo.col.pos.y-8,
+      canvas.chatInfo.col.size.x,
+      canvas.chatInfo.col.size.y
     );
 
     // Show chat selected
-    if (canvas.chatInfo.boxFocused) {
+    if (canvas.chatInfo.box.focused) {
       if (canvas.chatInfo.cursorAnm.toggle) {
         canvas.fill(colors["secondary"]);
         canvas.rect(
           canvas.chatInfo.box.pos.x + canvas.chatInfo.box.size.x - 8 - 4,
-          canvas.chatInfo.box.pos.y - 8 + 2,
-          2,
-          canvas.chatInfo.box.size.y - 4
+             canvas.chatInfo.box.pos.y - 8 + 2,
+          2, canvas.chatInfo.box.size.y - 4
         );
       }
+
+      // Show cursor animation
       canvas.chatInfo.cursorAnm.time--;
       if (canvas.chatInfo.cursorAnm.time < 0) {
         canvas.chatInfo.cursorAnm.time = canvas.chatInfo.cursorAnm.timeMax;
@@ -1236,39 +1260,41 @@ function chatCanvasFunc(canvas) {
     }
   }
 
-  // #endregion
 
-
-  // #region - Other
-
-  canvas.receiveMessage = function(data, type) { // Receive chat message
-    data.message = formatTextCharacters(data.message, 28);
-    if (data.chatColor == null) {data.chatColor = colors["secondary"];
-    } else if (type == 0) data.chatColor = color(data.chatColor[0],data.chatColor[1],data.chatColor[2]);
+  canvas.receiveMessage = function(data) {
+    // Receive chat message
+    if (data.formatting.size == null) data.formatting.size = 25;
+    if (data.formatting.bold == null) data.formatting.bold = false;
+    if (data.formatting.color == null) data.formatting.color = colors["secondary"];
+    else data.formatting.color = color(data.formatting.color[0], data.formatting.color[1], data.formatting.color[2]);
     canvas.chatInfo.messages.push(data);
   }
 
 
-  canvas.sendMessage = function() { // Send chat message
-    if (canvas.chatInfo.boxCurrent.length > 0) {
+  canvas.sendMessage = function() {
+    if (canvas.chatInfo.box.current.length > 0) {
+
+      // Request nickname
       if (canvas.chatInfo.nickname == "") {
-        if (canvas.chatInfo.boxCurrent.length > 10) {
+        if (canvas.chatInfo.box.current.length > 10) {
           canvas.receiveMessage({
             "message": "Enter a nickname 10 characters or less!",
-            "chatColor": null
-          }, 1);
-        } else {
-          socket.emit("chatRequestNickname", canvas.chatInfo.boxCurrent);
-        }
-      } else {
-        socket.emit("chatSendMessage", canvas.chatInfo.boxCurrent);
-      }
-      canvas.chatInfo.boxCurrent = "";
+            "formatting": {
+              "size": null,
+              "bold": true,
+              "color": null
+            }
+          });
+        } else socket.emit("chatRequestNickname", canvas.chatInfo.box.current);
+
+        // Send message
+      } else socket.emit("chatSendMessage", canvas.chatInfo.box.current);
+      canvas.chatInfo.box.current = "";
     }
   }
 
 
-  canvas.chatUpdateData = function(data) { // Update chat data
+  canvas.updateData = function(data) { // Update chat data
     canvas.chatInfo.chatColor = color(data.chatColor[0], data.chatColor[1], data.chatColor[2]);
     canvas.chatInfo.nickname = data.nickname;
   }
@@ -1290,16 +1316,18 @@ function chatCanvasFunc(canvas) {
   // #region - Input
 
   canvas.keyPressed = function() {
-    if (canvas.chatInfo.boxFocused) {
+    if (focusedCanvas == canvas) {
+      if (canvas.chatInfo.box.focused) {
 
-      // Send message on enter
-      if (keyCode == 13) {
-        canvas.sendMessage();
+        // Send message on enter
+        if (keyCode == 13) {
+          canvas.sendMessage();
 
-      // Type character upper / lower case using shift
-      } else if (keyCode >= 65 && keyCode <= 90 || keyCode == 32) {
-        if (keyIsDown(16)) canvas.chatInfo.box.current += key;
-        else canvas.chatInfo.box.current += key.toLowerCase();
+          // Type character upper / lower case using shift
+        } else if (keyCode >= 65 && keyCode <= 90 || keyCode == 32) {
+          if (keyIsDown(16)) canvas.chatInfo.box.current += key;
+          else canvas.chatInfo.box.current += key.toLowerCase();
+        }
       }
     }
   }
@@ -1311,23 +1339,20 @@ function chatCanvasFunc(canvas) {
       console.log("Focused chat");
 
       // Focus chat box
-      canvas.chatInfo.boxFocused = (
+      canvas.chatInfo.box.focused = (
         canvas.mouseX > canvas.chatInfo.box.pos.x
-        && canvas.mouseX < (canvas.chatInfo.box.pos.x+canvas.chatInfo.box.size.x)
+        && canvas.mouseX < (canvas.chatInfo.box.pos.x + canvas.chatInfo.box.size.x)
         && canvas.mouseY > canvas.chatInfo.box.pos.y
-        && canvas.mouseY < (canvas.chatInfo.box.pos.y+canvas.chatInfo.box.size.y)
+        && canvas.mouseY < (canvas.chatInfo.box.pos.y + canvas.chatInfo.box.size.y)
       );
 
       // Request color change
-      if (
-        canvas.mouseX > canvas.chatInfo.colPos.x
-        && canvas.mouseX < (canvas.chatInfo.colPos.x+canvas.chatInfo.colSize.x)
-        && canvas.mouseY > canvas.chatInfo.colPos.y
-        && canvas.mouseY < (canvas.chatInfo.colPos.y+canvas.chatInfo.colSize.y)
+      if (canvas.mouseX > canvas.chatInfo.col.pos.x
+        && canvas.mouseX < (canvas.chatInfo.col.pos.x + canvas.chatInfo.col.size.x)
+        && canvas.mouseY > canvas.chatInfo.col.pos.y
+        && canvas.mouseY < (canvas.chatInfo.col.pos.y + canvas.chatInfo.col.size.y)
         && canvas.chatInfo.nickname != ""
-      ) {
-        socket.emit("chatRequestColorChange");
-      }
+      ) socket.emit("chatRequestColorChange");
     }
   }
 
@@ -1365,9 +1390,7 @@ let screens;
 function preload() {
   // Prevent spacebar
   document.onkeydown = function(e) {
-    if (keyCode == 8) {
-      e.preventDefault();
-    }
+    e.preventDefault();
   };
 
   // Setup global variables
@@ -1514,15 +1537,30 @@ function formatTextCharacters(text_, count) {
 }
 
 
-function formatTextWidth(text_, width, textSize) {
+function formatTextWidth(text_, width, canvas) {
   // Format text to end line after a certain width
-  return formatTextCharacters(text_, width / textSize);
+  let text = text_;
+  let currentWidth = 0;
+  for (let i = 0; i < text.length; i++) {
+    currentWidth += canvas.textWidth(text[i]);
+    if (currentWidth > width) {
+      text = text.slice(0, i) + "\n" +  text.slice(i, text.length);
+      currentWidth = 0;
+    }
+  }
+  return text;
 }
 
 
 function focusCanvas(canvas) {
   // Focus a specified canvas
   focusedCanvas = canvas;
+}
+
+
+function keyPressed() {
+  for (let canvas of canvases)
+    canvas.keyPressed();
 }
 
 // #endregion
@@ -1604,7 +1642,7 @@ class menuShowClass {
       this.menu.canvas.noStroke();
       this.menu.canvas.fill(colors["secondary"]);
       this.menu.canvas.textSize(50);
-      this.menu.canvas.text(formatTextCharacters(this.class.name, 50), 350, 75);
+      this.menu.canvas.text(this.class.name, 350, 75);
       this.menu.canvas.rect(350- 22 * this.class.name.length / 2, 80, 22 * this.class.name.length, 2);
 
       // Show Tokens title
@@ -1614,7 +1652,7 @@ class menuShowClass {
 
       // Show description
       this.menu.canvas.textSize(30);
-      this.menu.canvas.text(formatTextCharacters(this.class.description, 50), 350, 125);
+      this.menu.canvas.text(formatTextWidth(this.class.description, 500, this.menu.canvas), 350, 125);
 
       // Show each class token
       for (let i = 0; i < this.class.tokens.length; i++) {

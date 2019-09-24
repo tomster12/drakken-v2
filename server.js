@@ -74,75 +74,45 @@ io.sockets.on("connection", function (socket) {
 
 
     // socket.on("gameLockin", function() {
-      //   console.log("Received lock");
-      //   lockCount++;
-      //   let player = socket==players[0]?"Player 1":"Player 2";
-      //   historySend({"text": (player + " locked in"), "formatting": {}});
-      //   if (lockCount == 2) setTimeout(gameTurn, 1000);
-      // });
-      //
-      //
-      // socket.on("gameTokenUsed", function(data) {
-        //   console.log("Token used: " + data.name);
-        //   if (socket == players[0]) players[1].emit("gameTokenUsed", data);
-        //   if (socket == players[1]) players[0].emit("gameTokenUsed", data);
-        // });
-        //
-        //
-        // socket.on("gameScoreUpdateSend", function(data) {
-          //   if (socket == players[0]) players[1].emit("gameScoreUpdateReceive", data);
-          //   if (socket == players[1]) players[0].emit("gameScoreUpdateReceive", data);
-          // });
-          //
-          //
-          // socket.on("gameTurnRoll", function(data) {
-            //   if (socket == players[0]) playersRoll[0] = data;
-            //   if (socket == players[1]) playersRoll[1] = data;
-            //   if (playersRoll[0] != null && playersRoll[1] != null) {
-              //     gameTurnScores();
-              //   }
-              // });
+    //   console.log("Received lock");
+    //   lockCount++;
+    //   let player = socket==players[0]?"Player 1":"Player 2";
+    //   historySend({"text": (player + " locked in"), "formatting": {}});
+    //   if (lockCount == 2) setTimeout(gameTurn, 1000);
+    // });
+    //
+    //
+    // socket.on("gameTokenUsed", function(data) {
+    //   console.log("Token used: " + data.name);
+    //   if (socket == players[0]) players[1].emit("gameTokenUsed", data);
+    //   if (socket == players[1]) players[0].emit("gameTokenUsed", data);
+    // });
+    //
+    //
+    // socket.on("gameScoreUpdateSend", function(data) {
+    //   if (socket == players[0]) players[1].emit("gameScoreUpdateReceive", data);
+    //   if (socket == players[1]) players[0].emit("gameScoreUpdateReceive", data);
+    // });
+    //
+    //
+    // socket.on("gameTurnRoll", function(data) {
+    //   if (socket == players[0]) playersRoll[0] = data;
+    //   if (socket == players[1]) playersRoll[1] = data;
+    //   if (playersRoll[0] != null && playersRoll[1] != null) {
+    //     gameTurnScores();
+    //   }
+    // });
 
-              // #endregion
+    // #endregion
 
 
     // #region - Chat
 
-    socket.on("chatRequestNickname", function(data) {
-      chatInfo[socket.id] = {
-        "nickname":data,
-        "chatColor": [Math.random()*255, Math.random()*255, Math.random()*255]
-      };
-      console.log("Nickname assigned: " + socket.id + " -> " + chatInfo[socket.id].nickname);
-      console.log("Color assigned: " + socket.id + " -> " + chatInfo[socket.id].chatColor);
-      socket.emit("chatUpdateData", chatInfo[socket.id]);
-      socket.join("chatRoom");
+    socket.on("chatRequestNickname", (data) => {chatRequestNickname(socket, data);});
 
-      socket.emit("chatReceiveMessage", {
-        "message": "Set nickname to '" + data + "'",
-        "chatColor": null
-      });
-    });
+    socket.on("chatRequestColorChange", (data) => {chatRequestColorChange(socket, data);});
 
-
-    socket.on("chatRequestColorChange", function(data) {
-      chatInfo[socket.id].chatColor = [Math.random()*255, Math.random()*255, Math.random()*255];
-      console.log("Color changed: " + socket.id + " -> " + chatInfo[socket.id].chatColor);
-      socket.emit("chatUpdateData", chatInfo[socket.id]);
-
-      socket.emit("chatReceiveMessage", {
-        "message": "Changed color",
-        "chatColor": null
-      });
-    });
-
-
-    socket.on("chatSendMessage", function(data) {
-      io.to("chatRoom").emit("chatReceiveMessage", {
-        "message":(chatInfo[socket.id].nickname+": " + data),
-        "chatColor":(chatInfo[socket.id].chatColor)
-      });
-    });
+    socket.on("chatSendMessage", (data) => {chatSendMessage(socket, data);});
 
     // #endregion
 
@@ -178,18 +148,12 @@ function historySendRequest(data) {
 // #endregion
 
 
-// #region - Chat
-
-// #endregion
-
-
 // #region - Game
 
 let players = [];
 // let playersRoll = [];
 // let lockCount = 0;
 // let turnCount = 1;
-// let chatInfo = {};
 
 
 function gameConnectRequest(socket, data) {
@@ -247,6 +211,61 @@ function gameEnd(reason) {
   // if (players[1] != null) players[1].emit("gameEnd", reason);
   players = [];
   console.log("Game Ended");
+}
+
+// #endregion
+
+
+// #region - Chat
+
+let chatInfo = {};
+
+
+function chatRequestNickname(socket, data) {
+  // Join chatroom and give nickname
+  socket.join("chatRoom");
+  chatInfo[socket.id] = {"nickname": data, "color": [0, 0, 0]};
+  console.log("Nickname assigned: " + socket.id + " -> " + chatInfo[socket.id].nickname);
+  socket.emit("chatReceiveMessage", {
+    "message": "Hello " + data + ", you have joined the chatroom!",
+    "formatting": {
+      "size": 30,
+      "bold": true,
+      "color": null
+    }
+  });
+
+  // Request color and update data
+  chatRequestColorChange(socket, null);
+  socket.emit("chatUpdateData", chatInfo[socket.id]);
+}
+
+
+function chatRequestColorChange(socket, data) {
+  let col = [Math.random() * 255, Math.random() * 255, Math.random() * 255];
+  chatInfo[socket.id].chatColor = col;
+  socket.emit("chatReceiveMessage", {
+    "message": "Set color to '" + Math.floor(col[0]) + ", " + Math.floor(col[1]) + ", " + Math.floor(col[2]) + "'",
+    "formatting": {
+      "size": null,
+      "bold": true,
+      "color": null
+    }
+  });
+  socket.emit("chatUpdateData", chatInfo[socket.id]);
+  console.log("Color changed: " + socket.id + " -> " + chatInfo[socket.id].chatColor);
+}
+
+
+function chatSendMessage(socket, data) {
+  io.to("chatRoom").emit("chatReceiveMessage", {
+    "message": (chatInfo[socket.id].nickname + ": " + data),
+    "formatting": {
+      "size": null,
+      "bold": false,
+      "color": (chatInfo[socket.id].chatColor)
+    }
+  });
 }
 
 // #endregion
