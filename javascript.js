@@ -1166,12 +1166,12 @@ function chatCanvasFunc(canvas) {
     canvas.textSize(25);
     let offsetCounter = 0, messageCounter = 0;
     for (let i = canvas.chatInfo.messages.length - 1; i >= 0; i--) {
-      let textToShow = formatTextWidth(canvas.chatInfo.messages[i].message, 220, canvas);
       canvas.textSize(canvas.chatInfo.messages[i].formatting.size);
+      let textToShow = formatTextWidth(canvas.chatInfo.messages[i].message, 250, canvas);
       offsetCounter += 1 + (textToShow.split("\n").length - 1);
       canvas.fill(canvas.chatInfo.messages[i].formatting.color);
       canvas.textFont(canvas.chatInfo.messages[i].formatting["bold"] ? fontBold : fontRegular);
-      canvas.text(textToShow, canvas.width - 15, canvas.height - 40 - offsetCounter * 30 - messageCounter * 20);
+      canvas.text(textToShow, canvas.width - 15, canvas.height - 65 - offsetCounter * 30 - messageCounter * 20);
       messageCounter++;
     }
 
@@ -1389,9 +1389,9 @@ let screens;
 
 function preload() {
   // Prevent spacebar
-  document.onkeydown = function(e) {
-    e.preventDefault();
-  };
+  // document.onkeydown = function(e) {
+  //   e.preventDefault();
+  // };
 
   // Setup global variables
   showDebug = false;
@@ -1445,35 +1445,23 @@ function getRandomToken() {
   // Common
   if (r1 < chances[0]) {
     let r2 = random(1);
-    if (r2 <= chances[3] && tokensData.class[screens[3].class.name.toLowerCase()].common.length>0) {
-      let r3 = floor(random(tokensData.class[screens[3].class.name.toLowerCase()].common.length));
-      return tokensData.class[screens[3].class.name.toLowerCase()].common[r3];
-    } else {
-      let r3 = floor(random(tokensData.neutral.common.length));
-      return tokensData.neutral.common[r3];
-    }
+    return (r2 <= chances[3] && screens[3].class.tokens[0].length > 0)
+    ? screens[3].class.tokens[0][floor(random(screens[3].class.tokens[0].length))]
+    : tokensData.neutral.common[floor(random(tokensData.neutral.common.length))];
 
   // Rare
 } else if (r1 < chances[0] + chances[1]) {
     let r2 = random(1);
-    if (r2 <= chances[3] && tokensData.class[screens[3].class.name.toLowerCase()].rare.length>0) {
-      let r3 = floor(random(tokensData.class[screens[3].class.name.toLowerCase()].rare.length));
-      return tokensData.class[screens[3].class.name.toLowerCase()].rare[r3];
-    } else {
-      let r3 = floor(random(tokensData.neutral.rare.length));
-      return tokensData.neutral.rare[r3];
-    }
+    return (r2 <= chances[3] && screens[3].class.tokens[1].length > 0)
+    ? screens[3].class.tokens[1][floor(random(screens[3].class.tokens[1].length))]
+    : tokensData.neutral.rare[floor(random(tokensData.neutral.rare.length))];
 
   // Legendary
 } else if (r1 < chances[0] + chances[1] + chances[2]) {
     let r2 = random(1);
-    if (r2 <= chances[3] && tokensData.class[screens[3].class.name.toLowerCase()].legendary.length>0) {
-      let r3 = floor(random(tokensData.class[screens[3].class.name.toLowerCase()].legendary.length));
-      return tokensData.class[screens[3].class.name.toLowerCase()].legendary[r3];
-    } else {
-      let r3 = floor(random(tokensData.neutral.legendary.length));
-      return tokensData.neutral.legendary[r3];
-    }
+    return (r2 <= chances[3] && screens[3].class.tokens[1].length > 0)
+    ? screens[3].class.tokens[2][floor(random(screens[3].class.tokens[2].length))]
+    : tokensData.neutral.legendary[floor(random(tokensData.neutral.legendary.length))];
   }
 }
 
@@ -1612,7 +1600,8 @@ class menuShowClass {
 
     // Draw image
     this.menu.canvas.tint(255, alpha);
-    this.menu.canvas.image(this.class.tokens[0].image, this.px, this.py, this.size, this.size);
+    if (this.class.showImage != null)
+      this.menu.canvas.image(this.class.showImage, this.px, this.py, this.size, this.size);
     this.menu.canvas.noTint();
 
     // If ontop or selected show name
@@ -1655,12 +1644,15 @@ class menuShowClass {
       this.menu.canvas.text(formatTextWidth(this.class.description, 500, this.menu.canvas), 350, 125);
 
       // Show each class token
-      for (let i = 0; i < this.class.tokens.length; i++) {
-        let interval = this.menu.classInfo.tokenInterval;
-        let size = this.menu.classInfo.tokenSize;
-        let px = this.menu.canvas.width - 100;
-        let py = 80 + (i + 0.35) *  interval;
-        this.menu.canvas.image(this.class.tokens[i].image, px, py, size, size);
+      for (let i = 0, counter = 0; i < this.class.tokens.length; i++) {
+          for (let o = 0; o < this.class.tokens[i].length; o++) {
+          let interval = this.menu.classInfo.tokenInterval;
+          let size = this.menu.classInfo.tokenSize;
+          let px = this.menu.canvas.width - 100;
+          let py = 80 + (counter + 0.35) *  interval;
+          this.menu.canvas.image(this.class.tokens[i][o].image, px, py, size, size);
+          counter++;
+        }
       }
     }
 

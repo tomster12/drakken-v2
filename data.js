@@ -498,39 +498,59 @@ function setupData() {
     new ClassData(
       "One",
       "One Trick depends on building for large, game-changing combos using his powerful class tokens.",
-      [tokensData.class.one.common[0]], function() {return "";}
+      function() {return "";}
     ),
     new ClassData(
       "Sniper",
       "The sniper relies on large, powerful blasts to the enemies score. He stores a small amount of score that the enemy gains to be used against them.",
-      [tokensData.class.sniper.common[0], tokensData.class.sniper.rare[0]], function() {return "Stored power: " + screens[3].extraInfo.sniperStoredDamage;}
+      function() {return "Stored power: " + screens[3].extraInfo.sniperStoredDamage;}
     ),
     new ClassData(
       "Warlock",
       "The warlock primarily focuses on keeping tempo and controlling score, until he can pull of his legendary combo. Every amount that he deals to the enemy, he gains half in score and every amount that the enemy gains, he loses half in score.",
-      [tokensData.class.warlock.rare[0]], function() {return "";}
+      function() {return "";}
     ),
     new ClassData(
       "Ogre",
       "A big lad who takes 35% less damage and permanently rolls 4 D8s instead of the default 5 D6s.",
-      [tokensData.class.ogre.common[0]], function() {return "";}
+      function() {return "";}
     ),
     new ClassData(
       "c0",
       "This is the description for c0",
-      [tokensData.neutral.common[0]], function() {return "";}
+      function() {return "";}
     ),
     new ClassData(
       "c1",
       "This is the description for c1",
-      [tokensData.neutral.common[0]], function() {return "";}
+      function() {return "";}
     ),
     new ClassData(
       "c2",
       "This is the description for c2",
-      [tokensData.neutral.common[0]], function() {return "";}
+      function() {return "";}
     )
   ];
+
+  // For each class
+  for (let i = 0; i < classesData.length; i++) {
+    if (tokensData.class[classesData[i].name.toLowerCase()] != null) {
+      classesData[i].tokens = [
+        tokensData.class[classesData[i].name.toLowerCase()].common,
+        tokensData.class[classesData[i].name.toLowerCase()].rare,
+        tokensData.class[classesData[i].name.toLowerCase()].legendary
+      ];
+    }
+    classesData[i].showImage =
+      classesData[i].tokens[0].length > 0
+      ? classesData[i].tokens[0][0].image
+      : classesData[i].tokens[1].length > 0
+      ? classesData[i].tokens[1][0].image
+      : classesData[i].tokens[2].length > 0
+      ? classesData[i].tokens[2][0].image
+      : tokensData.neutral.common[0].image;
+    if (classesData[i].showImage == null) console.log("test" + classesData[i].name);
+  }
 
   // For each token in each rarity in neutral - Set category/rarity/index, format description
   for (let [rarity, tokens] of Object.entries(tokensData.neutral)) {
@@ -575,8 +595,10 @@ class ClassData {
   constructor(name_, description_, tokens_, extraDescription_) {
     this.name = name_;
     this.description = description_;
-    this.tokens = tokens_;
     this.extraDescription = extraDescription_;
+
+    this.tokens = [[], [], []];
+    this.showImage = null;
   }
 }
 
@@ -584,7 +606,6 @@ class ClassData {
 class TokenData {
   constructor(name_, description_,
   affectsEnemy_, partial_, action_, otherAction_, image_) {
-
     this.name = name_;
     this.description = description_;
 
@@ -593,7 +614,9 @@ class TokenData {
     this.action = action_;
     this.otherAction = otherAction_;
     this.image = image_;
+
     this.category = "not set";
+    this.rarity = "not set";
     this.index = -1;
   }
 }
