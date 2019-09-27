@@ -1,9 +1,7 @@
 
 
-//      TODO
-
-//      SORT OUT SOCKET NAMING AND SYSTEM IN GENERAL
-
+//         TODO
+//  Sort out entire token socket system
 //  Additional formatting to chat messages
 //  Better system to split text based on width
 //    that instead splits at the start of words and
@@ -13,6 +11,34 @@
 //    the other client to perform a certain action
 // Create more targeted random for random color for chat
 // Update history to use a round based system
+
+
+//        Current problem
+//  Alot of positioning of different static  texts and boxes
+//  which each require positions / sizes
+//  2 options:
+
+//    hard code position into where it is drawn
+//    benefits:
+//      - dynamic sizing for different size canvases
+//        for mobile etc or for easily changing canvas size
+//      - easy to add new element to the screen without having
+//        large amounts of overhead code for formatting objects
+//    drawbacks:
+//      - have to find each element to change positioning / formatting
+
+//    put formatting and positioning into the setup of the canvas
+//    benefits:
+//      - easily change formatting and positioning of all
+//        objects on screens from a central location
+//    drawbacks:
+//      - alot of clutter code that fills up the setup function
+//      - takes longer to create a simple text as you need to create
+//        the formatting / position object alongside it
+
+//  potential fix would be to have variables before the code block that
+//  deals with drawing a specific element that would be easily in the code
+//  and also act as semi-centralized locations to change values
 
 
 // #region - Socket Functions
