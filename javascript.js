@@ -1,6 +1,9 @@
 
 
 //      TODO
+
+//      SORT OUT SOCKET NAMING AND SYSTEM IN GENERAL
+
 //  Additional formatting to chat messages
 //  Better system to split text based on width
 //    that instead splits at the start of words and
@@ -19,27 +22,23 @@ function connectToServer() {
   socket = io.connect();
 
 
+  // History
   socket.on("historyReceive", (data) => {historyCanvas.receive(data);});
 
+  // Game
+  socket.on("gameConnectResponse", (data) => {mainCanvas.screens[CONNECTING].gameConnectResponse(data);});
+  socket.on("gameStart", (data) => {mainCanvas.screens[GAME].gameStart(data);});
+  socket.on("gameTurn", (data) => {mainCanvas.screens[GAME].gameTurn(data);});
+  socket.on("gameTurnWin", (data) => {
+    mainCanvas.screens[GAME].scoreInfo.score += 10;
+    mainCanvas.screens[GAME].gameScoreUpdateSend("update");
+  });
+  socket.on("gameTokenUsed", (data) => {mainCanvas.screens[GAME].gameTokenUsed(data);});
+  socket.on("gameScoreUpdateReceive", (data) => {mainCanvas.screens[GAME].gameScoreUpdateReceive(data);});
+  socket.on("gameEnd", (data) => {mainCanvas.screens[GAME].gameEnd(data);});
 
-  socket.on("gameConnectResponse", (data) => {mainCanvas.screens[2].gameConnectResponse(data);});
-//   socket.on("gameStart", screens[3].gameStart);
-//   socket.on("gameTurn", screens[3].gameTurn);
-//   socket.on("gameTurnWin", function() {
-//     screens[3].scoreInfo.score += 10;
-//     screens[3].gameScoreUpdateSend("update");
-//   });
-//   socket.on("gameTokenUsed", function(data) {
-//     screens[3].gameTokenUsed(data);
-//   });
-//   socket.on("gameScoreUpdateReceive", function(data) {
-//     screens[3].gameScoreUpdateReceive(data);
-//   });
-//   socket.on("gameEnd", function(data) {
-//     screens[3].gameEnd(data);
-//   });
-//
-//
+
+  // Chat
   socket.on("chatReceiveMessage", (data) => {chatCanvas.receiveMessage(data)});
   socket.on("chatUpdateData", (data) => {chatCanvas.updateData(data)});
 }
@@ -67,6 +66,23 @@ function historyCanvasFunc(canvas) {
   canvas.setupVariables = function() {
     // Setup variables
     canvas.history = [];
+
+    canvas.titleFormatting = {
+      "textSize": 45,
+      "pos": {"x": canvas.width * 0.5, "y": 50},
+      "border": {
+        "height": 70,
+        "width": 2
+      }
+    }
+
+    canvas.historyFormatting = {
+      "defaultTextSize": 25,
+      "formatWidth": 300,
+      "pos": {"x": 20, "y": 100},
+      "lineDifference": 30,
+      "lineLimit": 15
+    }
   }
 
 
@@ -82,20 +98,20 @@ function historyCanvasFunc(canvas) {
 
     // Show title
     canvas.fill(colors["secondary"]);
-    canvas.textSize(45);
-    canvas.textAlign(LEFT);
-    canvas.text("History", 20, 50);
-    canvas.rect(0, 70, canvas.width, 2);
+    canvas.textSize(canvas.titleFormatting.textSize);
+    canvas.textAlign(CENTER);
+    canvas.text("History", canvas.titleFormatting.pos.x, canvas.titleFormatting.pos.y);
+    canvas.rect(0, canvas.titleFormatting.border.height, canvas.width, canvas.titleFormatting.border.width);
 
     // Show history
-    let counter = 0;
+    let lineCounter = 0;
     for (let i = canvas.history.length - 1; i >= 0; i--) {
-      let textToShow = formatTextWidth(canvas.history[i].text, 300, canvas);
-      canvas.fill(canvas.history[i].formatting.color);
       canvas.textSize(canvas.history[i].formatting.size);
-      canvas.text(textToShow, 20, 100 + counter * 30);
-      counter += 2 + (textToShow.split("\n").length - 1);
-      if (counter > 15) break;
+      let textToShow = formatTextWidth(canvas.history[i].text, canvas.historyFormatting.formatWidth, canvas);
+      canvas.fill(canvas.history[i].formatting.color);
+      canvas.text(textToShow, canvas.historyFormatting.pos.x, canvas.historyFormatting.pos.y + lineCounter * canvas.historyFormatting.lineDifference);
+      lineCounter += 2 + (textToShow.split("\n").length - 1);
+      if (lineCounter > canvas.historyFormatting.lineLimit) break;
     }
   }
 
@@ -105,12 +121,10 @@ function historyCanvasFunc(canvas) {
     canvas.history.push({
       "text": data.text,
       "formatting": {
-        "size": data.formatting.size != null ? data.formatting.size : 25,
-        "color":
-        data.formatting.color != null ? data.formatting.color
-        : (data.formatting.serverColor != null
-          ? color(data.formatting.serverColor[0], data.formatting.serverColor[1], data.formatting.serverColor[2])
-          : colors["secondary"])
+        "size": data.formatting.size != null ? data.formatting.size : this.historyFormatting.defaultTextSize,
+        "color": data.formatting.color != null ? data.formatting.color
+          : data.formatting.serverColor != null ? data.formatting.serverColor
+          : colors["secondary"]
         }
       });
     }
@@ -120,8 +134,7 @@ function historyCanvasFunc(canvas) {
 
   // #region - Input
 
-    canvas.keyPressed = function() {
-    }
+    canvas.keyPressed = function() {}
 
 
     canvas.mousePressed = function() {
@@ -261,7 +274,7 @@ function mainCanvasFunc(canvas) {
 
           // Additional setup
           for (let i = 0; i < classesData.length; i++)
-          this.classInfo.classList.push(new menuShowClass(this, classesData[i], i));
+          this.classInfo.classList.push(new MenuShowClass(this, classesData[i], i));
           this.selectClass(0);
         },
 
@@ -372,7 +385,7 @@ function mainCanvasFunc(canvas) {
           for (let i = 0; i < this.classInfo.classList.length; i++) {
             if (this.classInfo.classList[i].ontop()) {
               if (this.classInfo.classList[i].selected) {
-                // this.canvas.screens[3].currentClass = ----;
+                // this.canvas.screens[GAME].currentClass = ----;
                 this.canvas.connectToGame();
               } else this.selectClass(i);
             }
@@ -457,568 +470,395 @@ function mainCanvasFunc(canvas) {
 
 
       // #region - Game
+      {
 
-      // class GameScreen {
-      //   // #region - Setup
-      //
-      //   constructor() {
-      //     this.resetVariables();
-      //   }
-      //
-      //
-      //   resetVariables() {
-      //     this.objectsInfo = {
-      //       "tokenStart": {"x": 80, "y": 80},
-      //       "tokenInterval": 120,
-      //       "tokenSize": 100,
-      //
-      //       "diceStart": {"x": 325, "y": height - 80},
-      //       "diceInterval": 100,
-      //       "diceSize": 80,
-      //       "diceRowSize": 5,
-      //
-      //       "lockPos": {"x": 20, "y": height - 120},
-      //       "lockSize": {"x": 150, "y": 80},
-      //       "locked": false,
-      //
-      //       "extraTokenPos": {"x": 200, "y": height-110},
-      //       "extraTokenSize": {"x": 60, "y": 60},
-      //       "extraTokenHave": false,
-      //       "extraTokenUsed": false
-      //     }
-      //
-      //     this.scoreInfo = {
-      //       "score": 0,
-      //       "scoreGained": 0,
-      //       "scoreLost": 0,
-      //       "scoreDealt": 0,
-      //
-      //       "enemyScore": 0,
-      //       "enemyScoreGained": 0,
-      //       "enemyScoreLost": 0,
-      //       "enemyScoreDealt": 0
-      //     }
-      //
-      //     this.extraInfo = {
-      //       "exponentialUsed": 0,
-      //       "sniperStoredDamage": 0,
-      //       "blockDamage": false
-      //     }
-      //
-      //     this.playerName = "player0";
-      //     this.turnCount = 1;
-      //     this.started = false;
-      //     this.class = null
-      //     this.tokens = [];
-      //     this.dice = [];
-      //     this.score = 0;
-      //     this.enemyScore = 0;
-      //   }
-      //
-      //   // #endregion
-      //
-      //
-      //   // #region - Main
-      //
-      //   update() {
-      //     background(colors["background"]); // Token board
-      //     noStroke();
-      //     fill(colors["primary"]);
-      //     rect(0, 0, 100, height);
-      //     fill(colors["tertiary"]);
-      //     rect(100, 0, 10, height);
-      //
-      //     for (let i = 0; i < this.tokens.length; i++) { // Update tokens and dice
-      //       this.tokens[i].update();
-      //     }
-      //     for (let i = 0; i < this.dice.length; i++) {
-      //       this.dice[i].update();
-      //     }
-      //
-      //     noStroke(); // Show name and turn count
-      //     textSize(42);
-      //     textAlign(RIGHT);
-      //     if (this.playerName == "Player 1") {fill(34, 117, 246);
-      //     } else {fill(152, 40, 40)}
-      //     text(this.playerName, width - 30, 50);
-      //     fill(colors["secondary"]);
-      //     image(this.class.tokens[0].image, width-205, 37.5, 50, 50);
-      //     text("Turn " + this.turnCount, width - 30, 90);
-      //
-      //
-      //     let sc1 = this.scoreInfo.enemyScoreGained - this.scoreInfo.enemyScoreLost; // Show enemy score
-      //     if (sc1 > 0) {sc1 = "+"+fancyFormat(sc1, 2);
-      //     } else if (sc1 < 0) {sc1 = fancyFormat(sc1, 2);
-      //     } else {sc1 = "";}
-      //     text("Enemy Score: " + fancyFormat(this.scoreInfo.enemyScore, 2) + sc1, width - 30, 140);
-      //
-      //     let sc2 = this.scoreInfo.scoreGained - this.getScoreLost(); // Show friendly score
-      //     if (sc2 > 0) {sc2 = "+"+fancyFormat(sc2, 2);
-      //     } else if (sc2 < 0) {sc2 = fancyFormat(sc2, 2);
-      //     } else {sc2 = "";}
-      //     text("Score: " + fancyFormat(this.scoreInfo.score, 2) + sc2, width - 30, 180);
-      //     text("Roll: " + (this.dice.length>0?this.getRoll():0), width - 30, 220);
-      //     textAlign(CENTER);
-      //
-      //
-      //     if (this.started && dist(mouseX, mouseY, width-205+8, 37.5+8) < 25) { // Show class info
-      //       textSize(60);
-      //       text(this.class.name, width/2 + 110/2, 300);
-      //       textSize(35);
-      //       text(formatTextCharacters(this.class.description, 35) + "\n\n" + this.class.extraDescription(), width/2 + 110/2, 350);
-      //     }
-      //
-      //     strokeWeight(4); // Show lock button
-      //     stroke(colors["secondary"]);
-      //     if (this.objectsInfo.locked) { fill(210);
-      //     } else if (this.ontopLock()) { fill(180);
-      //     } else {fill(colors["primary"]);}
-      //     rect(
-      //       this.objectsInfo.lockPos.x,
-      //       this.objectsInfo.lockPos.y,
-      //       this.objectsInfo.lockSize.x,
-      //       this.objectsInfo.lockSize.y
-      //     );
-      //     textSize(40);
-      //     noStroke();
-      //     fill(colors["secondary"]);
-      //     text(
-      //       this.objectsInfo.locked?"Locked":"Lock-In",
-      //       this.objectsInfo.lockPos.x + this.objectsInfo.lockSize.x/2,
-      //       this.objectsInfo.lockPos.y + this.objectsInfo.lockSize.y/2+10
-      //     );
-      //
-      //     strokeWeight(4); // Show extra token button
-      //     stroke(colors["secondary"]);
-      //     if (this.objectsInfo.extraTokenUsed) { fill(210);
-      //     } else if (this.ontopExtraToken() && !this.objectsInfo.locked) { fill(180);
-      //     } else {fill(colors["primary"]);}
-      //     rect(
-      //       this.objectsInfo.extraTokenPos.x,
-      //       this.objectsInfo.extraTokenPos.y,
-      //       this.objectsInfo.extraTokenSize.x,
-      //       this.objectsInfo.extraTokenSize.y
-      //     );
-      //     if (this.ontopExtraToken()) {
-      //       noStroke();
-      //       fill(colors["secondary"]);
-      //       textSize(30);
-      //       textAlign(CENTER);
-      //       text(
-      //         "Extra token use (-20 score)",
-      //         this.objectsInfo.extraTokenPos.x
-      //         + this.objectsInfo.extraTokenSize.x/2,
-      //         this.objectsInfo.extraTokenPos.y-35
-      //       );
-      //     }
-      //
-      //     if (!this.started) { // Waiting for other player
-      //       noStroke();
-      //       fill(colors["secondary"]);
-      //       textSize(50);
-      //       text("Waiting for other player...", width/2 + 110/2, height/2);
-      //     }
-      //   }
-      //
-      //
-      //   // #region - Game
-      //
-      //   gameStart() { // Game started
-      //     this.started = true;
-      //     this.generateTokens(5);
-      //     let dAmount = 5;
-      //     let dSize = 6;
-      //     if (this.class.name=="Ogre") {dAmount=4; dSize=8;}
-      //     this.generateDice(dAmount, dSize);
-      //   }
-      //
-      //
-      //   gameTurn(data) { // Sent instantly as soon as both people are ready
-      //     this.scoreInfo.scoreGained += this.getRoll(); // Update score
-      //     this.gameScoreUpdateSend("end");
-      //     socket.emit("gameTurnRoll", this.getRoll());
-      //     this.scoreInfo.score += this.scoreInfo.scoreGained - this.getScoreLost();
-      //     this.scoreInfo.score = max(this.scoreInfo.score, 0);
-      //     this.scoreInfo.scoreGained = 0;
-      //     this.scoreInfo.scoreLost = 0;
-      //     this.extraInfo.blockDamage = false;
-      //     this.gameScoreUpdateSend("update");
-      //
-      //
-      //     this.turnCount = data.turn; // Reset variables
-      //     for (let i = 0; i < this.tokens.length; i++) this.tokens[i].turn();
-      //     this.dice = [];
-      //     let dAmount = 5;
-      //     let dSize = 6;
-      //     if (this.class.name=="Ogre") {dAmount=4; dSize=8;}
-      //     this.generateDice(dAmount, dSize);
-      //     this.generateTokens(max(0, 5-this.tokens.length));
-      //     this.objectsInfo.locked = false;
-      //     this.objectsInfo.extraTokenUsed = false;
-      //   }
-      //
-      //
-      //   gameEnd(data) { // Game ended - change screen back
-      //     currentScreen = 1;
-      //     screens[1].outputTextInfo = {
-      //       "text": "Game ended: " + data,
-      //       "time": 60,
-      //       "progress": 0
-      //     };
-      //     historyCanvas.history = [];
-      //   }
-      //
-      //
-      //   gameScoreUpdateSend(type) { // After: token use, enemy token use, extra token
-      //     let sendScoreInfo = {
-      //       "score": this.scoreInfo.score,
-      //       "scoreGained": this.scoreInfo.scoreGained,
-      //       "scoreLost": this.getScoreLost(),
-      //       "scoreDealt": this.scoreInfo.scoreDealt,
-      //     }
-      //     socket.emit("gameScoreUpdateSend", {"scoreInfo": sendScoreInfo, "type": type});
-      //   }
-      //
-      //
-      //   gameScoreUpdateReceive(data) {
-      //     if (data.type == "update") {
-      //       this.scoreInfo.enemyScore = data.scoreInfo.score;
-      //       this.scoreInfo.enemyScoreGained = data.scoreInfo.scoreGained;
-      //       this.scoreInfo.enemyScoreLost = data.scoreInfo.scoreLost;
-      //       this.scoreInfo.enemyScoreDealt = data.scoreInfo.scoreDealt;
-      //     } else {
-      //       if (this.class.name == "Sniper") this.extraInfo.sniperStoredDamage += 0.35*data.scoreInfo.scoreGained;
-      //     }
-      //   }
-      //
-      //
-      //   gameTokenUsed(data) { // Enemy used a token
-      //     let currentToken = data.params[0].token;
-      //     if (currentToken.category == "class") {
-      //       tokensData.class[currentToken.class][currentToken.rarity][currentToken.index].otherAction(data.params);
-      //     } else {
-      //       tokensData.neutral[currentToken.rarity][currentToken.index].otherAction(data.params);
-      //     }
-      //     screens[3].gameScoreUpdateSend("update");
-      //   }
-      //
-      //
-      //   lockTurn() { // Officially lock turn in after everything done
-      //     this.objectsInfo.locked = true;
-      //     socket.emit("gameLockin");
-      //   }
-      //
-      //
-      //   getScoreLost() {
-      //     let scoreLost = this.scoreInfo.scoreLost;
-      //     if (this.class.name == "Ogre") scoreLost *= 0.65;
-      //     if (this.extraInfo.blockDamage) scoreLost = 0;
-      //     return scoreLost;
-      //   }
-      //
-      //   // #endregion
-      //
-      //
-      //   // #region - Dice and Tokens
-      //
-      //   generateTokens(amount) {
-      //     for (let i = 0; i < amount; i++) {
-      //       this.tokens.push(
-      //         new ShowToken(null, this.tokens.length)
-      //       );
-      //     }
-      //   }
-      //   generateDice(amount, size) {
-      //     console.log("generating " + amount + " d" + size + "'s");
-      //     for (let i = 0; i < amount; i++) {
-      //       this.dice.push(
-      //         new ShowDice(size, this.dice.length)
-      //       );
-      //     }
-      //   }
-      //
-      //
-      //   updateTokenPositions() {
-      //     for (let i = 0; i < this.tokens.length; i++) {
-      //       this.tokens[i].index = i;
-      //       this.tokens[i].updateBasePos();
-      //     }
-      //   }
-      //   updateDicePositions() {
-      //     for (let i = 0; i < this.dice.length; i++) {
-      //       this.dice[i].index = i;
-      //       this.dice[i].updateBasePos();
-      //     }
-      //   }
-      //
-      //
-      //   selectToken(ind) {
-      //     this.selectedTokens.push(this.tokens[ind]);
-      //     this.tokens[ind].selected = true;
-      //   }
-      //   deselectTokens() {
-      //     for (let i = 0; i < this.tokens.length; i++) {
-      //       this.tokens[i].selected = false;
-      //     }
-      //   }
-      //   removeToken(ind) {
-      //     this.tokens.splice(ind, 1);
-      //   }
-      //
-      //   // #endregion
-      //
-      //
-      //   // #region - Other
-      //
-      //   ontopLock() {
-      //     return (mouseX > this.objectsInfo.lockPos.x
-      //     && mouseX < this.objectsInfo.lockPos.x+this.objectsInfo.lockSize.x
-      //     && mouseY > this.objectsInfo.lockPos.y
-      //     && mouseY < this.objectsInfo.lockPos.y+this.objectsInfo.lockSize.y);
-      //   }
-      //
-      //
-      //   ontopExtraToken() {
-      //     return (mouseX > this.objectsInfo.extraTokenPos.x
-      //     && mouseX < this.objectsInfo.extraTokenPos.x+this.objectsInfo.extraTokenSize.x
-      //     && mouseY > this.objectsInfo.extraTokenPos.y
-      //     && mouseY < this.objectsInfo.extraTokenPos.y+this.objectsInfo.extraTokenSize.y);
-      //   }
-      //
-      //
-      //   getRoll() {
-      //     let total = 0;
-      //     for (let i = 0; i < this.dice.length; i++) {
-      //       total += this.dice[i].value;
-      //     }
-      //     return total;
-      //   }
-      //
-      //   // #endregion
-      //
-      //   // #endregion
-      //
-      //
-      //   // #region - Input
-      //
-      //   mousePressed() {
-      //     for (let i = 0; i < this.tokens.length; i++) {
-      //       if (this.tokens[i].ontop() && !this.objectsInfo.locked) {
-      //         this.tokens[i].click();
-      //       }
-      //     }
-      //
-      //     if (this.started) {
-      //       if (this.ontopLock() && !this.objectsInfo.locked) {
-      //         this.lockTurn();
-      //       }
-      //
-      //       if (this.ontopExtraToken() && !this.objectsInfo.extraTokenUsed && !this.objectsInfo.locked && this.scoreInfo.score >= 20) {
-      //         this.objectsInfo.extraTokenUsed = true; // Purchase new token
-      //         this.objectsInfo.extraTokenHave = true;
-      //         this.scoreInfo.scoreLost += 20;
-      //         this.gameScoreUpdateSend("update");
-      //       }
-      //     }
-      //   }
-      //
-      //
-      //   keyPressed(keyCode) {}
-      //   mouseReleased() {}
-      //
-      //   // #endregion
-      // }
-      //
-      // // #region - ShowToken
-      //
-      // class ShowToken {
-      //
-      //   constructor(token_, index_) {
-      //     if (token_ == null) {this.token = getRandomToken();
-      //     } else {this.token = token_;}
-      //     this.index = index_;
-      //
-      //     this.used = false;
-      //     this.size = screens[3].objectsInfo.tokenSize;
-      //     this.updateBasePos();
-      //     this.px = this.basePx-100;
-      //     this.py = this.basePy;
-      //     this.gotoPx = this.basePx;
-      //     this.gotoPy = this.basePy;
-      //     this.turns = 0;
-      //   }
-      //
-      //
-      //   updateBasePos() {
-      //     this.basePx = screens[3].objectsInfo.tokenStart.x;
-      //     this.basePy = screens[3].objectsInfo.tokenStart.y
-      //       + screens[3].objectsInfo.tokenInterval*this.index;
-      //   }
-      //
-      //
-      //   update() {
-      //     if (!this.used) { // Update base position
-      //       this.gotoPx = this.basePx;
-      //       this.gotoPy = this.basePy;
-      //       if (this.ontop()) {
-      //         this.gotoPx = this.basePx+20;
-      //       }
-      //     }
-      //
-      //     if (this.px != this.gotoPx) { // Update actual position
-      //       let dir = (this.gotoPx-this.px) / 5;
-      //       if (abs(dir) < 0.02) {this.px = this.gotoPx;
-      //       } else {this.px += dir}
-      //     }
-      //     if (this.py != this.gotoPy) {
-      //       let dir = (this.gotoPy-this.py) / 5;
-      //       if (abs(dir) < 0.02) {this.py = this.gotoPy;
-      //       } else {this.py += dir}
-      //     }
-      //
-      //     if (this.used) { // Draw token
-      //       noStroke();
-      //       fill(colors["secondary"]);
-      //       ellipse(
-      //         this.px, this.py,
-      //         this.size+10, this.size+10
-      //       );
-      //     }
-      //     if (this.token.image != null) image(this.token.image, this.px, this.py, this.size, this.size);
-      //
-      //
-      //     if (this.ontop()) { // Show name and description
-      //       noStroke();
-      //       fill(colors["secondary"]);
-      //       textSize(60);
-      //       text(this.token.name, width/2 + 110/2, 300);
-      //       textSize(35);
-      //       text(this.token.description, width/2 + 110/2, 350);
-      //     }
-      //   }
-      //
-      //
-      //   animateOffscreen(params, callback) {
-      //     this.used = true;
-      //     this.gotoPx = -100;
-      //     let ind = this.index;
-      //     setTimeout(function(token) {
-      //       screens[3].updateDicePositions();
-      //       screens[3].removeToken(token.index);
-      //       screens[3].updateTokenPositions();
-      //     }, 600, this);
-      //     setTimeout(function() {callback(params);}, 600);
-      //   }
-      //
-      //
-      //   click() {
-      //     let complete = (!this.token.partial && !screens[3].objectsInfo.extraTokenHave);
-      //     if (screens[3].objectsInfo.extraTokenHave) screens[3].objectsInfo.extraTokenHave = false;
-      //     if (complete) screens[3].objectsInfo.locked = true;
-      //
-      //     let showToken = this;
-      //     this.used = true;
-      //     socket.emit("historySend", {"text": (screens[3].playerName + " used " + showToken.token.name), "formatting": {}});
-      //
-      //
-      //     this.token.action([
-      //       complete,
-      //       showToken
-      //     ], function(params) { // After instant action, animate and affect enemy
-      //
-      //       if (params[1].token.affectsEnemy) {
-      //         socket.emit("gameTokenUsed", {
-      //           "name": showToken.token.name,
-      //           "params": params.slice(1,params.length)
-      //         });
-      //       }
-      //
-      //       params[1].animateOffscreen(params, function(params) { // After animation, lock turn
-      //         if (params[0]) screens[3].lockTurn();
-      //         screens[3].gameScoreUpdateSend("update");
-      //       });
-      //     });
-      //   }
-      //
-      //
-      //   ontop() {
-      //     return(
-      //       dist(mouseX, mouseY, this.px, this.py) < this.size/2
-      //       || (
-      //         mouseX > 0
-      //         && mouseX < this.px
-      //         && mouseY > this.py-this.size/2
-      //         && mouseY < this.py+this.size/2
-      //       )
-      //     );
-      //   }
-      //
-      //
-      //   turn() {
-      //     this.turns++;
-      //     if (this.token.name == "Pacify" && this.turns == 2) {
-      //       this.animateOffscreen([], function() {
-      //         screens[3].tokens.push(new ShowToken(tokensData.unobtainable[0], screens[3].tokens.length));
-      //       });
-      //     }
-      //   }
-      // }
-      //
-      // // #endregion
-      //
-      //
-      // // #region - ShowDice
-      //
-      // class ShowDice {
-      //
-      //   constructor(diceSize_, index_) {
-      //     this.diceSize = diceSize_;
-      //     this.index = index_;
-      //     this.updateBasePos();
-      //     this.reroll();
-      //   }
-      //
-      //
-      //   updateBasePos() {
-      //     this.size = screens[3].objectsInfo.diceSize;
-      //     this.px = screens[3].objectsInfo.diceStart.x
-      //     + screens[3].objectsInfo.diceInterval*(this.index%screens[3].objectsInfo.diceRowSize);
-      //     this.py = screens[3].objectsInfo.diceStart.y
-      //     - floor(this.index/screens[3].objectsInfo.diceRowSize)
-      //     * screens[3].objectsInfo.diceSize*1.2;
-      //   }
-      //
-      //
-      //   reroll() {
-      //     this.value = floor(random(this.diceSize))+1;
-      //   }
-      //
-      //
-      //   update() {
-      //     image(
-      //       images.dice[6][this.value<=6?this.value:0],
-      //       this.px, this.py,
-      //       this.size, this.size
-      //     );
-      //
-      //     if (this.value > 6) {
-      //       noStroke();
-      //       fill(colors["tertiary"]);
-      //       textSize(50);
-      //       text(this.value, this.px, this.py+15);
-      //     }
-      //   }
-      // }
-      //
-      // // #endregion
+        // #region - Setup
 
+        initialize: function(canvas) {
+          this.canvas = canvas;
+          this.resetVariables();
+        },
+
+
+        resetVariables: function() {
+          this.objectsInfo = {
+            "tokenStart": {"x": 80, "y": 80},
+            "tokenInterval": 120,
+            "tokenSize": 100,
+
+            "diceStart": {"x": 325, "y": this.canvas.height - 80},
+            "diceInterval": 100,
+            "diceSize": 80,
+            "diceRowSize": 5,
+
+            "lockPos": {"x": 20, "y": this.canvas.height - 120},
+            "lockSize": {"x": 150, "y": 80},
+            "locked": false,
+
+            "extraTokenPos": {"x": 200, "y": this.canvas.height-110},
+            "extraTokenSize": {"x": 60, "y": 60},
+            "extraTokenHave": false,
+            "extraTokenUsed": false
+          }
+
+          this.scoreInfo = {
+            "score": 0,
+            "scoreGained": 0,
+            "scoreLost": 0,
+            "scoreDealt": 0,
+
+            "enemyScore": 0,
+            "enemyScoreGained": 0,
+            "enemyScoreLost": 0,
+            "enemyScoreDealt": 0
+          }
+
+          this.extraInfo = {
+            "exponentialUsed": 0,
+            "sniperStoredDamage": 0,
+            "blockDamage": false
+          }
+
+          this.playerName = "player0";
+          this.turnCount = 1;
+          this.started = false;
+          this.class = null;
+          this.tokens = [];
+          this.dice = [];
+          this.score = 0;
+          this.enemyScore = 0;
+        },
+
+        // #endregion
+
+
+        // #region - Main
+
+        update: function() {
+          this.canvas.background(colors["background"]);
+
+          // Token board
+          this.canvas.noStroke();
+          this.canvas.fill(colors["primary"]);
+          this.canvas.rect(0, 0, 100, this.canvas.height);
+          this.canvas.fill(colors["tertiary"]);
+          this.canvas.rect(100, 0, 10, this.canvas.height);
+
+          // Update tokens and dice
+          for (let i = 0; i < this.tokens.length; i++)
+            this.tokens[i].update();
+          for (let i = 0; i < this.dice.length; i++)
+            this.dice[i].update();
+
+          // Show name and turn count
+          this.canvas.noStroke();
+          this.canvas.textSize(42);
+          this.canvas.textAlign(RIGHT);
+          if (this.playerName == "Player 1") this.canvas.fill(34, 117, 246);
+          else this.canvas.fill(152, 40, 40);
+          this.canvas.text(this.playerName, this.canvas.width - 30, 50);
+          this.canvas.fill(colors["secondary"]);
+          this.canvas.image(this.class.showImage, this.canvas.width - 205, 37.5, 50, 50);
+          this.canvas.text("Turn " + this.turnCount, this.canvas.width - 30, 90);
+
+
+          let sc1 = this.scoreInfo.enemyScoreGained - this.scoreInfo.enemyScoreLost; // Show enemy score
+          if (sc1 > 0) {sc1 = "+"+fancyFormat(sc1, 2);
+          } else if (sc1 < 0) {sc1 = fancyFormat(sc1, 2);
+          } else {sc1 = "";}
+          text("Enemy Score: " + fancyFormat(this.scoreInfo.enemyScore, 2) + sc1, this.canvas.width - 30, 140);
+
+          let sc2 = this.scoreInfo.scoreGained - this.getScoreLost(); // Show friendly score
+          if (sc2 > 0) {sc2 = "+" + fancyFormat(sc2, 2);
+          } else if (sc2 < 0) {sc2 = fancyFormat(sc2, 2);
+          } else {sc2 = "";}
+          this.canvas.text("Score: " + fancyFormat(this.scoreInfo.score, 2) + sc2, this.canvas.width - 30, 180);
+          this.canvas.text("Roll: " + (this.dice.length>0?this.getRoll():0), this.canvas.width - 30, 220);
+          this.canvas.textAlign(CENTER);
+
+
+          if (this.started && dist(this.canvas.mouseX, this.canvas.mouseY, this.canvas.width-205+8, 37.5+8) < 25) { // Show class info
+            this.canvas.textSize(60);
+            this.canvas.text(this.class.name, this.canvas.width / 2 + 110/2, 300);
+            this.canvas.textSize(35);
+            this.canvas.text(formatTextCharacters(this.class.description, 35) + "\n\n" + this.class.extraDescription(), this.canvas.width/2 + 110/2, 350);
+          }
+
+          this.canvas.strokeWeight(4); // Show lock button
+          this.canvas.stroke(colors["secondary"]);
+          if (this.objectsInfo.locked) this.canvas.fill(210);
+          else if (this.ontopLock()) this.canvas.fill(180);
+          else this.canvas.fill(colors["primary"]);
+          this.canvas.rect(
+            this.objectsInfo.lockPos.x,
+            this.objectsInfo.lockPos.y,
+            this.objectsInfo.lockSize.x,
+            this.objectsInfo.lockSize.y
+          );
+          this.canvas.textSize(40);
+          this.canvas.noStroke();
+          this.canvas.fill(colors["secondary"]);
+          this.canvas.text(
+            this.objectsInfo.locked?"Locked":"Lock-In",
+            this.objectsInfo.lockPos.x + this.objectsInfo.lockSize.x/2,
+            this.objectsInfo.lockPos.y + this.objectsInfo.lockSize.y/2+10
+          );
+
+          this.canvas.strokeWeight(4); // Show extra token button
+          this.canvas.stroke(colors["secondary"]);
+          if (this.objectsInfo.extraTokenUsed) { fill(210);
+          } else if (this.ontopExtraToken() && !this.objectsInfo.locked) { fill(180);
+          } else {this.canvas.fill(colors["primary"]);}
+          this.canvas.rect(
+            this.objectsInfo.extraTokenPos.x,
+            this.objectsInfo.extraTokenPos.y,
+            this.objectsInfo.extraTokenSize.x,
+            this.objectsInfo.extraTokenSize.y
+          );
+          if (this.ontopExtraToken()) {
+            this.canvas.noStroke();
+            this.canvas.fill(colors["secondary"]);
+            this.canvas.textSize(30);
+            this.canvas.textAlign(CENTER);
+            this.canvas.text(
+              "Extra token use (-20 score)",
+              this.objectsInfo.extraTokenPos.x
+              + this.objectsInfo.extraTokenSize.x/2,
+              this.objectsInfo.extraTokenPos.y-35
+            );
+          }
+
+          if (!this.started) { // Waiting for other player
+            this.canvas.noStroke();
+            this.canvas.fill(colors["secondary"]);
+            this.canvas.textSize(50);
+            this.canvas.text("Waiting for other player...", this.canvas.width / 2 + 110 / 2, this.canvas.height / 2);
+          }
+        },
+
+        // #endregion
+
+
+        // #region - Game
+
+        gameStart: function() { // Game started
+          this.started = true;
+          this.generateTokens(5);
+          let dAmount = 5;
+          let dSize = 6;
+          if (this.class.name == "Ogre") {dAmount=4; dSize=8;}
+          this.generateDice(dAmount, dSize);
+        },
+
+
+        gameTurn: function(data) { // Sent instantly as soon as both people are ready
+          this.scoreInfo.scoreGained += this.getRoll(); // Update score
+          this.gameScoreUpdateSend("end");
+          socket.emit("gameTurnRoll", this.getRoll());
+          this.scoreInfo.score += this.scoreInfo.scoreGained - this.getScoreLost();
+          this.scoreInfo.score = max(this.scoreInfo.score, 0);
+          this.scoreInfo.scoreGained = 0;
+          this.scoreInfo.scoreLost = 0;
+          this.extraInfo.blockDamage = false;
+          this.gameScoreUpdateSend("update");
+
+
+          this.turnCount = data.turn; // Reset variables
+          for (let i = 0; i < this.tokens.length; i++) this.tokens[i].turn();
+          this.dice = [];
+          let dAmount = 5;
+          let dSize = 6;
+          if (this.class.name=="Ogre") {dAmount=4; dSize=8;}
+          this.generateDice(dAmount, dSize);
+          this.generateTokens(max(0, 5-this.tokens.length));
+          this.objectsInfo.locked = false;
+          this.objectsInfo.extraTokenUsed = false;
+        },
+
+
+        gameEnd: function(data) { // Game ended - change screen back
+          mainCanvas.screens[MENU].changeToMenu({
+            "text": "Game ended: " + data,
+            "time": 60,
+            "progress": 0
+          });
+          historyCanvas.history = [];
+        },
+
+
+        gameScoreUpdateSend: function(type) { // After: token use, enemy token use, extra token
+          let sendScoreInfo = {
+            "score": this.scoreInfo.score,
+            "scoreGained": this.scoreInfo.scoreGained,
+            "scoreLost": this.getScoreLost(),
+            "scoreDealt": this.scoreInfo.scoreDealt,
+          }
+          socket.emit("gameScoreUpdateSend", {"scoreInfo": sendScoreInfo, "type": type});
+        },
+
+
+        gameScoreUpdateReceive: function(data) {
+          if (data.type == "update") {
+            this.scoreInfo.enemyScore = data.scoreInfo.score;
+            this.scoreInfo.enemyScoreGained = data.scoreInfo.scoreGained;
+            this.scoreInfo.enemyScoreLost = data.scoreInfo.scoreLost;
+            this.scoreInfo.enemyScoreDealt = data.scoreInfo.scoreDealt;
+          } else {
+            if (this.class.name == "Sniper") this.extraInfo.sniperStoredDamage += 0.35*data.scoreInfo.scoreGained;
+          }
+        },
+
+
+        gameTokenUsed: function(data) { // Enemy used a token
+          let currentToken = data.params[0].token;
+          if (currentToken.category == "class") {
+            tokensData.class[currentToken.class][currentToken.rarity][currentToken.index].otherAction(data.params);
+          } else {
+            tokensData.neutral[currentToken.rarity][currentToken.index].otherAction(data.params);
+          }
+          screens[GAME].gameScoreUpdateSend("update");
+        },
+
+
+        lockTurn: function() { // Officially lock turn in after everything done
+          this.objectsInfo.locked = true;
+          socket.emit("gameLockin");
+        },
+
+
+        getScoreLost: function() {
+          let scoreLost = this.scoreInfo.scoreLost;
+          if (this.class.name == "Ogre") scoreLost *= 0.65;
+          if (this.extraInfo.blockDamage) scoreLost = 0;
+          return scoreLost;
+        },
+
+        // #endregion
+
+
+        // #region - Dice and Tokens
+
+        generateTokens: function(amount) {
+          for (let i = 0; i < amount; i++) {
+            this.tokens.push(
+              new GameShowToken(this.canvas, null, this.tokens.length)
+            );
+          }
+        },
+
+
+        generateDice: function(amount, size) {
+          console.log("generating " + amount + " d" + size + "'s");
+          for (let i = 0; i < amount; i++) {
+            this.dice.push(
+              new GameShowDice(this.canvas, size, this.dice.length)
+            );
+          }
+        },
+
+
+        updateTokenPositions: function() {
+          for (let i = 0; i < this.tokens.length; i++) {
+            this.tokens[i].index = i;
+            this.tokens[i].updateBasePos();
+          }
+        },
+
+
+        updateDicePositions: function() {
+          for (let i = 0; i < this.dice.length; i++) {
+            this.dice[i].index = i;
+            this.dice[i].updateBasePos();
+          }
+        },
+
+
+        selectToken: function(ind) {
+          this.selectedTokens.push(this.tokens[ind]);
+          this.tokens[ind].selected = true;
+        },
+
+
+        deselectTokens: function() {
+          for (let i = 0; i < this.tokens.length; i++) {
+            this.tokens[i].selected = false;
+          }
+        },
+
+
+        removeToken: function(ind) {
+          this.tokens.splice(ind, 1);
+        },
+
+        // #endregion
+
+
+        // #region - Other
+
+        ontopLock: function() {
+          return (this.canvas.mouseX > this.objectsInfo.lockPos.x
+          && this.canvas.mouseX < this.objectsInfo.lockPos.x+this.objectsInfo.lockSize.x
+          && this.canvas.mouseY > this.objectsInfo.lockPos.y
+          && this.canvas.mouseY < this.objectsInfo.lockPos.y+this.objectsInfo.lockSize.y);
+        },
+
+
+        ontopExtraToken: function() {
+          return (this.canvas.mouseX > this.objectsInfo.extraTokenPos.x
+          && this.canvas.mouseX < this.objectsInfo.extraTokenPos.x+this.objectsInfo.extraTokenSize.x
+          && this.canvas.mouseY > this.objectsInfo.extraTokenPos.y
+          && this.canvas.mouseY < this.objectsInfo.extraTokenPos.y+this.objectsInfo.extraTokenSize.y);
+        },
+
+
+        getRoll: function() {
+          let total = 0;
+          for (let i = 0; i < this.dice.length; i++) {
+            total += this.dice[i].value;
+          }
+          return total;
+        },
+
+        // #endregion
+
+
+        // #region - Input
+
+        mousePressed: function() {
+          for (let i = 0; i < this.tokens.length; i++) {
+            if (this.tokens[i].ontop() && !this.objectsInfo.locked) {
+              this.tokens[i].click();
+            }
+          }
+
+          if (this.started) {
+            if (this.ontopLock() && !this.objectsInfo.locked) {
+              this.lockTurn();
+            }
+
+            if (this.ontopExtraToken() && !this.objectsInfo.extraTokenUsed && !this.objectsInfo.locked && this.scoreInfo.score >= 20) {
+              this.objectsInfo.extraTokenUsed = true; // Purchase new token
+              this.objectsInfo.extraTokenHave = true;
+              this.scoreInfo.scoreLost += 20;
+              this.gameScoreUpdateSend("update");
+            }
+          }
+        },
+
+
+        keyPressed: function() {},
+        mouseReleased: function() {}
+
+        // #endregion
+
+      }
       // #endregion
     ]
 
     // Setup variables
     for (let screen of canvas.screens)
       screen.initialize(canvas);
-    canvas.currentScreen = 0;
+    canvas.currentScreen = INTRO;
     canvas.connected = false;
     focusedCanvas = canvas;
   }
@@ -1036,14 +876,16 @@ function mainCanvasFunc(canvas) {
 
   canvas.connectToGame = function() {
     // Change to connection screen and connect
-    canvas.currentScreen = 2;
-    canvas.screens[2].gameConnectRequest();
+    canvas.screens[CONNECTING].gameConnectRequest();
+    canvas.currentScreen = CONNECTING;
   }
 
 
   canvas.startGame = function(playerNum) {
     // Start the game as player playerNum
     console.log("starting game, player " + playerNum);
+    canvas.screens[GAME].class = canvas.screens[MENU].classInfo.classSelected.class;
+    canvas.currentScreen = GAME;
   }
 
 
@@ -1051,11 +893,11 @@ function mainCanvasFunc(canvas) {
     // Log errors to console
     if (information != null) {
       console.log("changing to menu " + information.text + ", " + information.time);
-      canvas.screens[1].outputTextInfo = information;
+      canvas.screens[MENU].outputTextInfo = information;
     } else console.log("changing to menu");
 
     // Change to menu
-    canvas.currentScreen = 1;
+    canvas.currentScreen = MENU;
   }
 
   // #endregion
@@ -1122,27 +964,64 @@ function chatCanvasFunc(canvas) {
     canvas.chatInfo = {
       "connected": true,
       "nickname": "",
-      "chatColor": null,
+      "color": null,
       "messages": [],
+      "formatWidth": 250,
+
       "deleteTimer": 0,
+      "deleteTimerMax": 5
+    };
 
-      "box": {
-        "pos": {"x": 50, "y": canvas.height-32},
-        "size": {"x": 240, "y": 20},
-        "focused": false,
-        "current": "",
+    canvas.cursorAnmInfo  = {
+      "time": 0,
+      "timeMax": 20,
+      "toggle": false
+    };
+
+
+    canvas.chatFormatting = {
+      "pos": {"x": canvas.width - 35 , "y": canvas.height - 65},
+      "formatWidth": 215,
+      "lineDifference": 30,
+      "messageDifference": 20
+    }
+
+    canvas.inputBoxFormatting = {
+      "pos": {"x": 50, "y": canvas.height - 32},
+      "size": {"x": 240, "y": 20},
+      "focused": false,
+      "current": "",
+      "textSize": 20,
+      "textOffset": {"x": -15, "y": -12},
+
+      "border": {
+        "height": canvas.height - 62,
+        "width": 2
       },
 
-      "cursorAnm": {
-        "time": 0,
-        "timeMax": 20,
-        "toggle": false
+      "background": {
+        "height": canvas.height - 60,
+        "width": 60
       },
+    };
 
-      "col": {
-        "pos": {"x": 20, "y": canvas.height-32},
-        "size": {"x": 20, "y": 20}
+    canvas.changeColorFormatting = {
+      "pos": {"x": 20, "y": canvas.height - 32},
+      "size": {"x": 20, "y": 20}
+    };
+
+    canvas.titleFormatting = {
+      "textSize": 45,
+      "pos": {"x": canvas.width - 20, "y": 50},
+      "border": {
+        "height": 70,
+        "width": 2
       }
+    };
+
+    canvas.nicknameFormatting = {
+      "textSize": 20,
+      "pos": {"x": 25, "y": 45}
     };
   }
 
@@ -1154,101 +1033,103 @@ function chatCanvasFunc(canvas) {
   canvas.draw = function() {
     // Update chat deletion
     if (canvas.chatInfo.deleteTimer > 0) canvas.chatInfo.deleteTimer--;
-    if (keyIsDown(8) && canvas.chatInfo.box.focused && canvas.chatInfo.deleteTimer == 0) {
-      canvas.chatInfo.box.current = canvas.chatInfo.box.current.slice(0, canvas.chatInfo.box.current.length - 1);
-      canvas.chatInfo.deleteTimer = 5;
+    if (keyIsDown(8) && canvas.inputBoxFormatting.focused && canvas.chatInfo.deleteTimer == 0) {
+      canvas.inputBoxFormatting.current = canvas.inputBoxFormatting.current.slice(0, canvas.inputBoxFormatting.current.length - 1);
+      canvas.chatInfo.deleteTimer = canvas.chatInfo.deleteTimerMax;
     }
 
-    // Main formatting
+    // Background
     canvas.background(colors["tertiary"]);
 
     // Show chat messages
-    canvas.textSize(25);
-    let offsetCounter = 0, messageCounter = 0;
+    let lineCounter = 0, messageCounter = 0;
     for (let i = canvas.chatInfo.messages.length - 1; i >= 0; i--) {
       canvas.textSize(canvas.chatInfo.messages[i].formatting.size);
-      let textToShow = formatTextWidth(canvas.chatInfo.messages[i].message, 250, canvas);
-      offsetCounter += 1 + (textToShow.split("\n").length - 1);
-      canvas.fill(canvas.chatInfo.messages[i].formatting.color);
       canvas.textFont(canvas.chatInfo.messages[i].formatting["bold"] ? fontBold : fontRegular);
-      canvas.text(textToShow, canvas.width - 15, canvas.height - 65 - offsetCounter * 30 - messageCounter * 20);
+      let textToShow = formatTextWidth(canvas.chatInfo.messages[i].message, canvas.chatFormatting.formatWidth, canvas);
+      lineCounter += 1 + (textToShow.split("\n").length - 1);
+
+      canvas.fill(canvas.chatInfo.messages[i].formatting.color);
+      canvas.text(textToShow, canvas.chatFormatting.pos.x, canvas.chatFormatting.pos.y
+        - lineCounter * canvas.chatFormatting.lineDifference
+        - messageCounter * canvas.chatFormatting.messageDifference);
       messageCounter++;
     }
 
     // Show title
     canvas.noStroke();
     canvas.fill(colors["tertiary"]);
-    canvas.rect(0, 0, canvas.width, 70);
+    canvas.rect(0, 0, canvas.width, canvas.titleFormatting.border.height);
+
+    canvas.textSize(canvas.titleFormatting.textSize);
     canvas.fill(colors["secondary"]);
-    canvas.textSize(45);
-    canvas.text("Chat", canvas.width - 20, 50);
-    canvas.rect(0, 70, canvas.width, 2);
+    canvas.text("Chat", canvas.titleFormatting.pos.x, canvas.titleFormatting.pos.y);
+    canvas.rect(0, 70, canvas.width, canvas.titleFormatting.border.width);
 
     // Show nickname
     if (canvas.chatInfo.nickname != "") {
-      canvas.fill(canvas.chatInfo.chatColor);
+      canvas.fill(canvas.chatInfo.color);
       canvas.textAlign(LEFT);
-      canvas.textSize(20);
-      canvas.text(canvas.chatInfo.nickname, 25, 45);
+      canvas.textSize(canvas.nicknameFormatting.textSize);
+      canvas.text(canvas.chatInfo.nickname, canvas.nicknameFormatting.pos.x, canvas.nicknameFormatting.pos.y);
       canvas.textAlign(RIGHT);
     }
 
-    // Show chat box
+    // Show input box
     canvas.fill(colors["secondary"]);
     canvas.rect(0, canvas.height - 62, canvas.width, 2);
     canvas.fill(colors["primary"]);
     canvas.rect(0, canvas.height - 60, canvas.width, 60);
     canvas.fill(colors["tertiary"]);
     canvas.rect(
-      canvas.chatInfo.box.pos.x-8,
-      canvas.chatInfo.box.pos.y-8,
-      canvas.chatInfo.box.size.x,
-      canvas.chatInfo.box.size.y
+      canvas.inputBoxFormatting.pos.x - 8,
+      canvas.inputBoxFormatting.pos.y - 8,
+      canvas.inputBoxFormatting.size.x,
+      canvas.inputBoxFormatting.size.y
     );
 
     // Show box text
-    canvas.textSize(16);
+    canvas.textSize(canvas.inputBoxFormatting.textSize);
     canvas.fill(colors["secondary"]);
     canvas.text(
-      canvas.chatInfo.box.current,
-      canvas.chatInfo.box.pos.x+canvas.chatInfo.box.size.x-15,
-      canvas.chatInfo.box.pos.y+canvas.chatInfo.box.size.y-12
+      canvas.inputBoxFormatting.current,
+      canvas.inputBoxFormatting.pos.x + canvas.inputBoxFormatting.size.x + canvas.inputBoxFormatting.textOffset.x,
+      canvas.inputBoxFormatting.pos.y + canvas.inputBoxFormatting.size.y + canvas.inputBoxFormatting.textOffset.y
     );
 
     // Cover unneeded box text
     canvas.fill(colors["primary"]);
     canvas.rect(
-      canvas.chatInfo.box.pos.x - 40 - 8,
-      canvas.chatInfo.box.pos.y - 8,
-      40,
-      canvas.chatInfo.box.size.y
+      canvas.inputBoxFormatting.pos.x - 40 - 8,
+      canvas.inputBoxFormatting.pos.y - 8,
+      40, canvas.inputBoxFormatting.size.y
     );
 
     // Show color change request
     canvas.fill(255);
     canvas.rect(
-      canvas.chatInfo.col.pos.x-8,
-      canvas.chatInfo.col.pos.y-8,
-      canvas.chatInfo.col.size.x,
-      canvas.chatInfo.col.size.y
+      canvas.changeColorFormatting.pos.x - 8,
+      canvas.changeColorFormatting.pos.y - 8,
+      canvas.changeColorFormatting.size.x,
+      canvas.changeColorFormatting.size.y
     );
 
     // Show chat selected
-    if (canvas.chatInfo.box.focused) {
-      if (canvas.chatInfo.cursorAnm.toggle) {
+    if (canvas.inputBoxFormatting.focused) {
+      if (canvas.cursorAnmInfo.toggle) {
         canvas.fill(colors["secondary"]);
         canvas.rect(
-          canvas.chatInfo.box.pos.x + canvas.chatInfo.box.size.x - 8 - 4,
-             canvas.chatInfo.box.pos.y - 8 + 2,
-          2, canvas.chatInfo.box.size.y - 4
+          canvas.inputBoxFormatting.pos.x + canvas.inputBoxFormatting.size.x - 8 - 4,
+             canvas.inputBoxFormatting.pos.y - 8 + 2,
+          2, canvas.inputBoxFormatting.size.y - 4
         );
       }
 
       // Show cursor animation
-      canvas.chatInfo.cursorAnm.time--;
-      if (canvas.chatInfo.cursorAnm.time < 0) {
-        canvas.chatInfo.cursorAnm.time = canvas.chatInfo.cursorAnm.timeMax;
-        canvas.chatInfo.cursorAnm.toggle = !canvas.chatInfo.cursorAnm.toggle;
+      canvas.cursorAnmInfo.time--;
+      if (canvas.cursorAnmInfo.time < 0) {
+        canvas.cursorAnmInfo.time = canvas.cursorAnmInfo.timeMax;
+        canvas.cursorAnmInfo.toggle = !canvas.cursorAnmInfo.toggle;
       }
     }
 
@@ -1256,7 +1137,7 @@ function chatCanvasFunc(canvas) {
     if (showDebug) {
       canvas.fill(colors["secondary"]);
       canvas.text("Focused: " + (focusedCanvas == canvas), canvas.width * 0.65, 35);
-      canvas.text("Chat Focused: " + canvas.chatInfo.box.focused, canvas.width * 0.65, 60);
+      canvas.text("Chat Focused: " + canvas.inputBoxFormatting.focused, canvas.width * 0.65, 60);
     }
   }
 
@@ -1272,11 +1153,11 @@ function chatCanvasFunc(canvas) {
 
 
   canvas.sendMessage = function() {
-    if (canvas.chatInfo.box.current.length > 0) {
+    if (canvas.inputBoxFormatting.current.length > 0) {
 
       // Request nickname
       if (canvas.chatInfo.nickname == "") {
-        if (canvas.chatInfo.box.current.length > 10) {
+        if (canvas.inputBoxFormatting.current.length > 10) {
           canvas.receiveMessage({
             "message": "Enter a nickname 10 characters or less!",
             "formatting": {
@@ -1285,17 +1166,17 @@ function chatCanvasFunc(canvas) {
               "color": null
             }
           });
-        } else socket.emit("chatRequestNickname", canvas.chatInfo.box.current);
+        } else socket.emit("chatRequestNickname", canvas.inputBoxFormatting.current);
 
         // Send message
-      } else socket.emit("chatSendMessage", canvas.chatInfo.box.current);
-      canvas.chatInfo.box.current = "";
+      } else socket.emit("chatSendMessage", canvas.inputBoxFormatting.current);
+      canvas.inputBoxFormatting.current = "";
     }
   }
 
 
   canvas.updateData = function(data) { // Update chat data
-    canvas.chatInfo.chatColor = color(data.chatColor[0], data.chatColor[1], data.chatColor[2]);
+    canvas.chatInfo.color = color(data.chatColor[0], data.chatColor[1], data.chatColor[2]);
     canvas.chatInfo.nickname = data.nickname;
   }
 
@@ -1317,7 +1198,7 @@ function chatCanvasFunc(canvas) {
 
   canvas.keyPressed = function() {
     if (focusedCanvas == canvas) {
-      if (canvas.chatInfo.box.focused) {
+      if (canvas.inputBoxFormatting.focused) {
 
         // Send message on enter
         if (keyCode == 13) {
@@ -1325,8 +1206,8 @@ function chatCanvasFunc(canvas) {
 
           // Type character upper / lower case using shift
         } else if (keyCode >= 65 && keyCode <= 90 || keyCode == 32) {
-          if (keyIsDown(16)) canvas.chatInfo.box.current += key;
-          else canvas.chatInfo.box.current += key.toLowerCase();
+          if (keyIsDown(16)) canvas.inputBoxFormatting.current += key;
+          else canvas.inputBoxFormatting.current += key.toLowerCase();
         }
       }
     }
@@ -1339,18 +1220,18 @@ function chatCanvasFunc(canvas) {
       console.log("Focused chat");
 
       // Focus chat box
-      canvas.chatInfo.box.focused = (
-        canvas.mouseX > canvas.chatInfo.box.pos.x
-        && canvas.mouseX < (canvas.chatInfo.box.pos.x + canvas.chatInfo.box.size.x)
-        && canvas.mouseY > canvas.chatInfo.box.pos.y
-        && canvas.mouseY < (canvas.chatInfo.box.pos.y + canvas.chatInfo.box.size.y)
+      canvas.inputBoxFormatting.focused = (
+        canvas.mouseX > canvas.inputBoxFormatting.pos.x
+        && canvas.mouseX < (canvas.inputBoxFormatting.pos.x + canvas.inputBoxFormatting.size.x)
+        && canvas.mouseY > canvas.inputBoxFormatting.pos.y
+        && canvas.mouseY < (canvas.inputBoxFormatting.pos.y + canvas.inputBoxFormatting.size.y)
       );
 
       // Request color change
-      if (canvas.mouseX > canvas.chatInfo.col.pos.x
-        && canvas.mouseX < (canvas.chatInfo.col.pos.x + canvas.chatInfo.col.size.x)
-        && canvas.mouseY > canvas.chatInfo.col.pos.y
-        && canvas.mouseY < (canvas.chatInfo.col.pos.y + canvas.chatInfo.col.size.y)
+      if (canvas.mouseX > canvas.changeColorFormatting.pos.x
+        && canvas.mouseX < (canvas.changeColorFormatting.pos.x + canvas.changeColorFormatting.size.x)
+        && canvas.mouseY > canvas.changeColorFormatting.pos.y
+        && canvas.mouseY < (canvas.changeColorFormatting.pos.y + canvas.changeColorFormatting.size.y)
         && canvas.chatInfo.nickname != ""
       ) socket.emit("chatRequestColorChange");
     }
@@ -1367,6 +1248,12 @@ function chatCanvasFunc(canvas) {
 
 
 // #region - Setup
+
+// Constants
+let INTRO = 0;
+let MENU = 1;
+let CONNECTING = 2;
+let GAME = 3;
 
 // Canvases
 let historyCanvas;
@@ -1445,22 +1332,22 @@ function getRandomToken() {
   // Common
   if (r1 < chances[0]) {
     let r2 = random(1);
-    return (r2 <= chances[3] && screens[3].class.tokens[0].length > 0)
-    ? screens[3].class.tokens[0][floor(random(screens[3].class.tokens[0].length))]
+    return (r2 <= chances[3] && mainCanvas.screens[GAME].class.tokens[0].length > 0)
+    ? mainCanvas.screens[GAME].class.tokens[0][floor(random(mainCanvas.screens[GAME].class.tokens[0].length))]
     : tokensData.neutral.common[floor(random(tokensData.neutral.common.length))];
 
   // Rare
 } else if (r1 < chances[0] + chances[1]) {
     let r2 = random(1);
-    return (r2 <= chances[3] && screens[3].class.tokens[1].length > 0)
-    ? screens[3].class.tokens[1][floor(random(screens[3].class.tokens[1].length))]
+    return (r2 <= chances[3] && mainCanvas.screens[GAME].class.tokens[1].length > 0)
+    ? mainCanvas.screens[GAME].class.tokens[1][floor(random(mainCanvas.screens[GAME].class.tokens[1].length))]
     : tokensData.neutral.rare[floor(random(tokensData.neutral.rare.length))];
 
   // Legendary
 } else if (r1 < chances[0] + chances[1] + chances[2]) {
     let r2 = random(1);
-    return (r2 <= chances[3] && screens[3].class.tokens[1].length > 0)
-    ? screens[3].class.tokens[2][floor(random(screens[3].class.tokens[2].length))]
+    return (r2 <= chances[3] && mainCanvas.screens[GAME].class.tokens[1].length > 0)
+    ? mainCanvas.screens[GAME].class.tokens[2][floor(random(mainCanvas.screens[GAME].class.tokens[2].length))]
     : tokensData.neutral.legendary[floor(random(tokensData.neutral.legendary.length))];
   }
 }
@@ -1556,9 +1443,9 @@ function keyPressed() {
 
 // #region - Classes
 
-// #region - menuShowClass
+// #region - MenuShowClass
 
-class menuShowClass {
+class MenuShowClass {
   constructor(menu_, class_, index_) {
     // Setup variables
     this.menu = menu_;
@@ -1599,10 +1486,11 @@ class menuShowClass {
     }
 
     // Draw image
-    this.menu.canvas.tint(255, alpha);
-    if (this.class.showImage != null)
+    if (alpha > 2) {
+      this.menu.canvas.tint(255, alpha);
       this.menu.canvas.image(this.class.showImage, this.px, this.py, this.size, this.size);
-    this.menu.canvas.noTint();
+      this.menu.canvas.noTint();
+    }
 
     // If ontop or selected show name
     if (this.ontop() || this.selected) {
@@ -1671,6 +1559,199 @@ class menuShowClass {
       dist(this.menu.canvas.mouseX, this.menu.canvas.mouseY, this.px, this.py) < this.size / 2
       && abs(this.index - this.menu.scrollInfo.scrollProgress) <= this.menu.classInfo.alphaLimit - 0.125
     );
+  }
+}
+
+// #endregion
+
+
+// #region - GameShowToken
+
+class GameShowToken {
+
+  constructor(canvas_, token_, index_) {
+    this.canvas = canvas_;
+    if (token_ == null) this.token = getRandomToken();
+    else this.token = token_;
+    this.index = index_;
+
+    this.used = false;
+    this.size = mainCanvas.screens[GAME].objectsInfo.tokenSize;
+    this.updateBasePos();
+    this.px = this.basePx - 100;
+    this.py = this.basePy;
+    this.gotoPx = this.basePx;
+    this.gotoPy = this.basePy;
+    this.turns = 0;
+  }
+
+
+  updateBasePos() {
+    this.basePx = mainCanvas.screens[GAME].objectsInfo.tokenStart.x;
+    this.basePy = mainCanvas.screens[GAME].objectsInfo.tokenStart.y
+      + mainCanvas.screens[GAME].objectsInfo.tokenInterval * this.index;
+  }
+
+
+  update() {
+    // Update base position
+    if (!this.used) {
+      this.gotoPx = this.basePx;
+      this.gotoPy = this.basePy;
+      if (this.ontop()) {
+        this.gotoPx = this.basePx+20;
+      }
+    }
+
+    // Update actual position
+    if (this.px != this.gotoPx) {
+      let dir = (this.gotoPx-this.px) / 5;
+      if (abs(dir) < 0.02) {this.px = this.gotoPx;
+      } else {this.px += dir}
+    }
+    if (this.py != this.gotoPy) {
+      let dir = (this.gotoPy-this.py) / 5;
+      if (abs(dir) < 0.02) {this.py = this.gotoPy;
+      } else {this.py += dir}
+    }
+
+    // Draw token
+    if (this.used) {
+      this.canvas.noStroke();
+      this.canvas.fill(colors["secondary"]);
+      this.canvas.ellipse(
+        this.px, this.py,
+        this.size+10, this.size+10
+      );
+    }
+    if (this.token.image != null)
+      this.canvas.image(this.token.image, this.px, this.py, this.size, this.size);
+
+    // Show name and description
+    if (this.ontop()) {
+      this.canvas.noStroke();
+      this.canvas.fill(colors["secondary"]);
+      this.canvas.textSize(60);
+      this.canvas.text(this.token.name, this.canvas.width / 2 + 110 / 2, 300);
+      this.canvas.textSize(35);
+      this.canvas.text(formatTextWidth(this.token.description, 300, this.canvas), this.canvas.width / 2 + 110 / 2, 350);
+    }
+  }
+
+
+  animateOffscreen(params, callback) {
+    this.used = true;
+    this.gotoPx = -100;
+    let ind = this.index;
+    setTimeout(function(token) {
+      mainCanvas.screens[GAME].updateDicePositions();
+      mainCanvas.screens[GAME].removeToken(token.index);
+      mainCanvas.screens[GAME].updateTokenPositions();
+    }, 600, this);
+    setTimeout(function() {callback(params);}, 600);
+  }
+
+
+  click() {
+    let complete = (!this.token.partial && !mainCanvas.screens[GAME].objectsInfo.extraTokenHave);
+    if (mainCanvas.screens[GAME].objectsInfo.extraTokenHave) mainCanvas.screens[GAME].objectsInfo.extraTokenHave = false;
+    if (complete) mainCanvas.screens[GAME].objectsInfo.locked = true;
+
+    this.used = true;
+    socket.emit("historySend", {"text": (mainCanvas.screens[GAME].playerName + " used " + this.token.name), "formatting": {}});
+
+
+    console.log("using token " + this.token.name);
+    this.token.action([
+      complete,
+      showToken
+    ], function(params) { // After instant action, animate and affect enemy
+      console.log("token action completed " + this.token.name);
+
+      if (params[1].token.affectsEnemy) {
+        console.log("affecting enemy " + this.token.name);
+        socket.emit("gameTokenUsed", {
+          "name": showToken.token.name,
+          "params": params.slice(1, params.length)
+        });
+      }
+
+      params[1].animateOffscreen(params, function(params) { // After animation, lock turn
+        console.log("token finished" + this.token.name);
+        if (params[0]) mainCanvas.screens[GAME].lockTurn();
+        mainCanvas.screens[GAME].gameScoreUpdateSend("update");
+      });
+    });
+  }
+
+
+  ontop() {
+    return(
+      dist(this.canvas.mouseX, this.canvas.mouseY, this.px, this.py) < this.size / 2
+      || (
+        this.canvas.mouseX > 0
+        && this.canvas.mouseX < this.px
+        && this.canvas.mouseY > this.py - this.size/2
+        && this.canvas.mouseY < this.py + this.size/2
+      )
+    );
+  }
+
+
+  turn() {
+    this.turns++;
+    if (this.token.name == "Pacify" && this.turns == 2) {
+      this.animateOffscreen([], function() {
+        mainCanvas.screens[GAME].tokens.push(new GameShowToken(tokensData.unobtainable[0], mainCanvas.screens[GAME].tokens.length));
+      });
+    }
+  }
+}
+
+// #endregion
+
+
+// #region - GameShowDice
+
+class GameShowDice {
+
+  constructor(canvas_, diceSize_, index_) {
+    this.canvas = canvas_;
+    this.diceSize = diceSize_;
+    this.index = index_;
+    this.updateBasePos();
+    this.reroll();
+  }
+
+
+  updateBasePos() {
+    this.size = mainCanvas.screens[GAME].objectsInfo.diceSize;
+    this.px = mainCanvas.screens[GAME].objectsInfo.diceStart.x
+    + mainCanvas.screens[GAME].objectsInfo.diceInterval*(this.index % mainCanvas.screens[GAME].objectsInfo.diceRowSize);
+    this.py = mainCanvas.screens[GAME].objectsInfo.diceStart.y
+    - floor(this.index / mainCanvas.screens[GAME].objectsInfo.diceRowSize)
+    * mainCanvas.screens[GAME].objectsInfo.diceSize * 1.2;
+  }
+
+
+  reroll() {
+    this.value = floor(random(this.diceSize))+1;
+  }
+
+
+  update() {
+    this.canvas.image(
+      images.dice[6][this.value <= 6 ? this.value : 0],
+      this.px, this.py,
+      this.size, this.size
+    );
+
+    if (this.value > 6) {
+      this.canvas.noStroke();
+      this.canvas.fill(colors["tertiary"]);
+      this.canvas.textSize(50);
+      this.canvas.text(this.value, this.px, this.py + 15);
+    }
   }
 }
 
