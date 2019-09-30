@@ -110,7 +110,7 @@ io.sockets.on("connection", function (socket) {
 
     socket.on("chatRequestNickname", (data) => {chatRequestNickname(socket, data);});
 
-    socket.on("chatRequestColorChange", (data) => {chatRequestColorChange(socket, data);});
+    socket.on("chatRequestChangeColor", (data) => {chatRequestChangeColor(socket, data);});
 
     socket.on("chatSendMessage", (data) => {chatSendMessage(socket, data);});
 
@@ -242,12 +242,12 @@ function chatRequestNickname(socket, data) {
   });
 
   // Request color and update data
-  chatRequestColorChange(socket, null);
+  chatRequestChangeColor(socket, null);
   socket.emit("chatUpdateData", chatInfo[socket.id]);
 }
 
 
-function chatRequestColorChange(socket, data) {
+function chatRequestChangeColor(socket, data) {
   let col = [Math.random() * 255, Math.random() * 255, Math.random() * 255];
   chatInfo[socket.id].chatColor = col;
   socket.emit("chatReceiveMessage", {
