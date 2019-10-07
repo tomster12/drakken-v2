@@ -71,37 +71,10 @@ io.sockets.on("connection", function (socket) {
     // #region - Game
 
     socket.on("gameConnectRequest", (data) => {gameConnectRequest(socket, data);});
-
-
-    socket.on("gameLockin", function() {
-      console.log("Received lock");
-      lockCount++;
-      let player = socket==players[0]?"Player 1":"Player 2";
-      historySendRequest(socket, {"text": (player + " locked in"), "formatting": {}});
-      if (lockCount == 2) setTimeout(gameTurn, 1000);
-    });
-
-
-    socket.on("gameTokenUsed", function(data) {
-      console.log("Token used: " + data.name);
-      if (socket == players[0]) players[1].emit("gameTokenUsed", data);
-      if (socket == players[1]) players[0].emit("gameTokenUsed", data);
-    });
-
-
-    socket.on("gameScoreUpdateSend", function(data) {
-      if (socket == players[0]) players[1].emit("gameScoreUpdateReceive", data);
-      if (socket == players[1]) players[0].emit("gameScoreUpdateReceive", data);
-    });
-
-
-    socket.on("gameTurnRoll", function(data) {
-      if (socket == players[0]) playersRoll[0] = data;
-      if (socket == players[1]) playersRoll[1] = data;
-      if (playersRoll[0] != null && playersRoll[1] != null) {
-        gameTurnScores();
-      }
-    });
+    socket.on("gameLockin", (data) => {gameLockin(socket, data);});
+    socket.on("gameTokenUsed", (data) => {gameTokenUsed(socket, data);});
+    socket.on("gameScoreUpdateSend", (data) => {gameScoreUpdateSend(socket, data);});
+    socket.on("gameTurnRoll", (data) => {gameTurnRoll(socket, data);});
 
     // #endregion
 
@@ -172,13 +145,43 @@ function gameConnectRequest(socket, data) {
 }
 
 
-function gameStart(socket) {
+function gameStart() {
   lockCount = 0;
   turnCount = 1;
   players[0].emit("gameStart");
   players[1].emit("gameStart");
-  historySendRequest(socket, {"text": ("        - Turn "+turnCount+"-"), "formatting": {"size": 35}});
+  historySendRequest(socket, {"text": ("        - Turn "+turnCount + "-"), "formatting": {"size": 35}});
   console.log("Game started");
+}
+
+
+function gameLockin(socket, data) {
+  console.log("Received lock");
+  lockCount++;
+  let player = socket == players[0] ? "Player 1" : "Player 2";
+  historySendRequest(socket, {"text": (player + " locked in"), "formatting": {}});
+  if (lockCount == 2) setTimeout(gameTurn, 1000);
+}
+
+
+function gameTokenUsed(socket, data) {
+  if (socket == players[0]) players[1].emit("gameTokenUsed", data);
+  if (socket == players[1]) players[0].emit("gameTokenUsed", data);
+}
+
+
+function gameScoreUpdateSend(socket, data) {
+  if (socket == players[0]) players[1].emit("gameScoreUpdateReceive", data);
+  if (socket == players[1]) players[0].emit("gameScoreUpdateReceive", data);
+}
+
+
+function gameTurnRoll(socket, data) {
+  if (socket == players[0]) playersRoll[0] = data;
+  if (socket == players[1]) playersRoll[1] = data;
+  if (playersRoll[0] != null && playersRoll[1] != null) {
+    gameTurnScores();
+  }
 }
 
 

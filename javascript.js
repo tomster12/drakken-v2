@@ -1,4 +1,15 @@
 
+
+
+
+
+//          There is way too much to fix
+
+
+
+
+
+
 //         TODONE
 //  Better system to split text based on width
 //    that instead splits at the start of words and
@@ -8,17 +19,23 @@
 //         TODO
 //  Sort out entire game socket communication and logic
 //  Sort out entire token socket system
-//  Additional formatting to chat messages
-//  Finish cleaning up and implementing the game screen
 //  Fully redo how the tokens send actions over to tell
 //    the other client to perform a certain action
-// Create more targeted random for random color for chat
+
+//  Finish cleaning up and implementing the game screen
+// Add functionality for unique history additions for tokens
+//  Additional formatting to chat messages
 // Update history to use a round based system
+// Create more targeted random for random color for chat
+// Something special for rolling 30
 
 
 //        CURRENT PATH
-//  - Get tokens working with current main screen
 //  - Redo parameter handling with tokens
+//  - Get common tokens working with current main screen
+//  - Find a way to properly send showtoken across communication
+//    (or atleast just the token)
+//        CURRENT POSITION
 //  - Check over entire game communication loop and
 //    refactor code to work optimally
 //  - Check that token and class data is written
@@ -34,7 +51,6 @@ let socket;
 function connectToServer() {
   socket = io.connect();
 
-
   // History
   socket.on("historyReceive", (data) => {historyCanvas.receive(data);});
 
@@ -49,7 +65,6 @@ function connectToServer() {
   socket.on("gameTokenUsed", (data) => {mainCanvas.screens[GAME].gameTokenUsed(data);});
   socket.on("gameScoreUpdateReceive", (data) => {mainCanvas.screens[GAME].gameScoreUpdateReceive(data);});
   socket.on("gameEnd", (data) => {mainCanvas.screens[GAME].gameEnd(data);});
-
 
   // Chat
   socket.on("chatReceiveMessage", (data) => {chatCanvas.receiveMessage(data)});
@@ -119,6 +134,7 @@ function historyCanvasFunc(canvas) {
     canvas.rect(0, canvas.formatting.title.border.posY, canvas.width, canvas.formatting.title.border.sizeX);
 
     // Show history
+    canvas.textAlign(LEFT);
     let lineCounter = 0;
     for (let i = canvas.history.length - 1; i >= 0; i--) {
       canvas.textSize(canvas.history[i].formatting.size);
@@ -571,10 +587,10 @@ function mainCanvasFunc(canvas) {
 
           // Show enemy score
           let sc1 = this.scoreInfo.enemyScoreGained - this.scoreInfo.enemyScoreLost;
-          if (sc1 > 0) {sc1 = "+"+fancyFormat(sc1, 2);
+          if (sc1 > 0) {sc1 = "+" + fancyFormat(sc1, 2);
           } else if (sc1 < 0) {sc1 = fancyFormat(sc1, 2);
           } else {sc1 = "";}
-          text("Enemy Score: " + fancyFormat(this.scoreInfo.enemyScore, 2) + sc1, this.canvas.width - 30, 140);
+          this.canvas.text("Enemy Score: " + fancyFormat(this.scoreInfo.enemyScore, 2) + sc1, this.canvas.width - 30, 140);
 
           // Show friendly score
           let sc2 = this.scoreInfo.scoreGained - this.getScoreLost();
@@ -664,9 +680,12 @@ function mainCanvasFunc(canvas) {
 
 
         gameTurn: function(data) { // Sent instantly as soon as both people are ready
-          this.scoreInfo.scoreGained += this.getRoll(); // Update score
+          // Add roll to score gained, send a final gameScoreUpdate and update server with roll
+          this.scoreInfo.scoreGained += this.getRoll();
           this.gameScoreUpdateSend("end");
           socket.emit("gameTurnRoll", this.getRoll());
+
+          // Update score with scoreGained / lost, reset back to 0 then update server
           this.scoreInfo.score += this.scoreInfo.scoreGained - this.getScoreLost();
           this.scoreInfo.score = max(this.scoreInfo.score, 0);
           this.scoreInfo.scoreGained = 0;
@@ -715,20 +734,17 @@ function mainCanvasFunc(canvas) {
             this.scoreInfo.enemyScoreGained = data.scoreInfo.scoreGained;
             this.scoreInfo.enemyScoreLost = data.scoreInfo.scoreLost;
             this.scoreInfo.enemyScoreDealt = data.scoreInfo.scoreDealt;
-          } else {
-            if (this.class.name == "Sniper") this.extraInfo.sniperStoredDamage += 0.35*data.scoreInfo.scoreGained;
-          }
+          } else if (this.class.name == "Sniper") this.extraInfo.sniperStoredDamage += 0.35 * data.scoreInfo.scoreGained;
         },
 
 
         gameTokenUsed: function(data) { // Enemy used a token
-          let currentToken = data.params[0].token;
-          if (currentToken.category == "class") {
-            tokensData.class[currentToken.class][currentToken.rarity][currentToken.index].otherAction(data.params);
-          } else {
-            tokensData.neutral[currentToken.rarity][currentToken.index].otherAction(data.params);
-          }
-          screens[GAME].gameScoreUpdateSend("update");
+          let oToken = data.token;
+          console.log("enemy used token " + oToken.name);
+          if (oToken.category == "class")
+            tokensData.class[oToken.class][oToken.rarity][oToken.index].foreignAction(data);
+          else tokensData.neutral[oToken.rarity][oToken.index].foreignAction(data);
+          mainCanvas.screens[GAME].gameScoreUpdateSend("update");
         },
 
 
@@ -837,6 +853,7 @@ function mainCanvasFunc(canvas) {
         // #region - Input
 
         mousePressed: function() {
+          // Click on tokens
           for (let i = 0; i < this.tokens.length; i++) {
             if (this.tokens[i].ontop() && !this.objectsInfo.locked) {
               this.tokens[i].click();
@@ -844,12 +861,14 @@ function mainCanvasFunc(canvas) {
           }
 
           if (this.started) {
+            // Manually lock turn
             if (this.ontopLock() && !this.objectsInfo.locked) {
               this.lockTurn();
             }
 
+            // Purchase new token
             if (this.ontopExtraToken() && !this.objectsInfo.extraTokenUsed && !this.objectsInfo.locked && this.scoreInfo.score >= 20) {
-              this.objectsInfo.extraTokenUsed = true; // Purchase new token
+              this.objectsInfo.extraTokenUsed = true;
               this.objectsInfo.extraTokenHave = true;
               this.scoreInfo.scoreLost += 20;
               this.gameScoreUpdateSend("update");
@@ -1325,10 +1344,10 @@ function setup() {
 function getRandomToken() {
   // Return a random token from any rarity, class or no class
   let chances = [
-    0.675,  // Common
+    1, // 0.675,  // Common
     0.25,   // Rare
     0.075,  // Legendary
-    0.35    // Class
+    0, // 0.35    // Class
   ];
   let r1 = random(1);
 
@@ -1349,7 +1368,7 @@ function getRandomToken() {
   // Legendary
 } else if (r1 < chances[0] + chances[1] + chances[2]) {
     let r2 = random(1);
-    return (r2 <= chances[3] && mainCanvas.screens[GAME].class.tokens[1].length > 0)
+    return (r2 <= chances[3] && mainCanvas.screens[GAME].class.tokens[2].length > 0)
     ? mainCanvas.screens[GAME].class.tokens[2][floor(random(mainCanvas.screens[GAME].class.tokens[2].length))]
     : tokensData.neutral.legendary[floor(random(tokensData.neutral.legendary.length))];
   }
@@ -1603,9 +1622,8 @@ class GameShowToken {
     if (!this.used) {
       this.gotoPx = this.basePx;
       this.gotoPy = this.basePy;
-      if (this.ontop()) {
-        this.gotoPx = this.basePx+20;
-      }
+      if (this.ontop())
+        this.gotoPx = this.basePx + 20;
     }
 
     // Update actual position
@@ -1647,48 +1665,59 @@ class GameShowToken {
   animateOffscreen(params, callback) {
     this.used = true;
     this.gotoPx = -100;
-    let ind = this.index;
     setTimeout(function(token) {
       mainCanvas.screens[GAME].updateDicePositions();
       mainCanvas.screens[GAME].removeToken(token.index);
       mainCanvas.screens[GAME].updateTokenPositions();
     }, 600, this);
-    setTimeout(function() {callback(params);}, 600);
+    setTimeout(function(params) {callback(params);}, 600, params);
   }
 
 
   click() {
-    // Handle extra token usage
-    let complete = (!this.token.partial && !mainCanvas.screens[GAME].objectsInfo.extraTokenHave);
-    if (mainCanvas.screens[GAME].objectsInfo.extraTokenHave) mainCanvas.screens[GAME].objectsInfo.extraTokenHave = false;
-    if (complete) mainCanvas.screens[GAME].objectsInfo.locked = true;
+    if (!this.used) {
+      // If token is a partial then don't complete turn
+      let complete = true;
+      if (this.token.partial) complete = false;
 
-    // Primary update of token usage
-    this.used = true;
-    socket.emit("historySend", {"text": (mainCanvas.screens[GAME].playerName + " used " + this.token.name), "formatting": {}});
-
-
-    console.log("using token " + this.token.name);
-    this.token.action([
-      complete,
-      showToken
-    ], function(params) { // After instant action, animate and affect enemy
-      console.log("token action completed " + this.token.name);
-
-      if (params[1].token.affectsEnemy) {
-        console.log("affecting enemy " + this.token.name);
-        socket.emit("gameTokenUsed", {
-          "name": showToken.token.name,
-          "params": params.slice(1, params.length)
-        });
+      // If token is not a partial and have an extra token dont complete and use extra token
+      else if (mainCanvas.screens[GAME].objectsInfo.extraTokenHave) {
+        complete = false;
+        mainCanvas.screens[GAME.objectsInfo.extraTokenHave] = false;
       }
 
-      params[1].animateOffscreen(params, function(params) { // After animation, lock turn
-        console.log("token finished" + this.token.name);
-        if (params[0]) mainCanvas.screens[GAME].lockTurn();
-        mainCanvas.screens[GAME].gameScoreUpdateSend("update");
+      // Lock from using other tokens if complete
+      if (complete) mainCanvas.screens[GAME].objectsInfo.locked = true;
+
+      // Primary update of token usage
+      console.log("using token " + this.token.name);
+      this.used = true;
+      socket.emit("historySend", {"text": (mainCanvas.screens[GAME].playerName + " used " + this.token.name), "formatting": {}});
+
+      // Use local action
+      this.token.action({
+        "complete": complete,
+        "token": this.token,
+        "showToken": this
+      }, (params) => {
+        console.log("token action completed " + this.token.name);
+
+        // Animate then lock screen and update score
+        console.log("animating offscreen");
+        this.animateOffscreen(params, (params) => {
+          console.log("token finished" + this.token.name);
+          if (params.complete) mainCanvas.screens[GAME].lockTurn();
+          mainCanvas.screens[GAME].gameScoreUpdateSend("update");
+        });
+
+        // Call foreign action if required
+        if (this.token.affectsEnemy) {
+          console.log("affecting enemy " + this.token.name);
+          params.showToken = null;
+          socket.emit("gameTokenUsed", params);
+        }
       });
-    });
+    }
   }
 
 
@@ -1742,7 +1771,7 @@ class GameShowDice {
 
 
   reroll() {
-    this.value = floor(random(this.diceSize))+1;
+    this.value = floor(random(this.diceSize)) + 1;
   }
 
 
