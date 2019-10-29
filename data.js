@@ -17,11 +17,12 @@ function setupData() {
   };
 
   // TokenData - (Name, Description, affects enemy, completes turn, local func, foreign func, image)
+  // The callback animates, updates score, locks if neccessary and sends foreign action if neccessary
   tokensData = {
     "neutral": {
       "common": [
         new TokenData(
-          "D8", "Roll a D8 and set all of your dice to its value.",
+          "D8", "Set your first dice to a D8 and reroll then set all your dice to be copies.",
           false, false, loadImage("Assets/Images/Tokens/Neutral/Common/D8.png"),
           function(params, callback) {
 
@@ -37,7 +38,7 @@ function setupData() {
         ),
 
         new TokenData(
-          "Equaliser", "For each of your dice if they are even half them, if they are odd double them.",
+          "Equaliser", "For each of your dice if they are even half their value, if they are odd double their value.",
           false, false, loadImage("Assets/Images/Tokens/Neutral/Common/Equaliser.png"),
           function(params, callback) {
 
@@ -60,7 +61,7 @@ function setupData() {
             let damage = 15 * Math.pow(1.1, mainCanvas.screens[GAME].extraInfo.exponentialUsed);
             params.damage = damage;
             mainCanvas.screens[GAME].extraInfo.exponentialUsed++;
-            mainCanvas.screens[GAME].scoreInfo.scoreDealt += damage;
+            mainCanvas.screens[GAME].gameScoreUpdate(0, 0, damage);
             socket.emit("historySend", {
               "text": ("and dealt " + fancyFormat(damage, 2)),
               "formatting": {}
@@ -69,7 +70,7 @@ function setupData() {
           }, function(params) {
 
             // Take damage based on damage parameter defined previously
-            mainCanvas.screens[GAME].scoreInfo.scoreLost += params.damage;
+            mainCanvas.screens[GAME].gameScoreUpdate(0, params.damage, 0);
           },
         ),
 
@@ -80,10 +81,10 @@ function setupData() {
 
             // For each corrosive goo increment count and animate offscreen
             let count = 0;
+            params.preventAnimation = true;
             for (let i = 0; i < mainCanvas.screens[GAME].tokens.length; i++) {
               let currentToken = mainCanvas.screens[GAME].tokens[i];
-              if (currentToken.token.name == "Corrosive Goo"
-                && currentToken != params.showToken) {
+              if (currentToken.token.name == "Corrosive Goo") {
                 count++;
                 currentToken.animateOffscreen([], function(params) {});
               }
@@ -92,13 +93,13 @@ function setupData() {
             // Calculate damage based on number of corrosive goos
             let damage = mainCanvas.screens[GAME].scoreInfo.score * (0.1 + 0.15 * count);
             params.damage = damage;
-            mainCanvas.screens[GAME].scoreInfo.scoreDealt += damage;
+            mainCanvas.screens[GAME].gameScoreUpdate(0, 0, damage);
             socket.emit("historySend", {"text": ("and dealt " + fancyFormat(damage, 2) + " with " + (count+1) + " goos"), "formatting": {}});
             callback(params);
           }, function(params) {
 
             // Take damage based on damage parameter defined previously
-            mainCanvas.screens[GAME].scoreInfo.scoreLost += params[1];
+            mainCanvas.screens[GAME].gameScoreUpdate(0, params[1], 0);
           },
         ),
 
@@ -108,7 +109,7 @@ function setupData() {
 
           // Gain 15 score
           function(params, callback) {
-            mainCanvas.screens[GAME].scoreInfo.scoreGained += 15;
+            mainCanvas.screens[GAME].gameScoreUpdate(15, 0, 0);
             socket.emit("historySend", {"text": ("and gained " + 15), "formatting": {}});
             callback(params);
           }, function(params) {}
@@ -122,12 +123,13 @@ function setupData() {
             // Deal 15 score
             let damage = 15;
             params.damage = damage;
+            mainCanvas.screens[GAME].gameScoreUpdate(0, 0, params.damage);
             socket.emit("historySend", {"text": ("and dealt " + fancyFormat(damage, 2)), "formatting": {}});
             callback(params);
           }, function(params) {
 
             // Take damage based on damage parameter defined previously
-            mainCanvas.screens[GAME].scoreInfo.scoreLost += params.damage;
+            mainCanvas.screens[GAME].gameScoreUpdate(0, params.damage, 0);
           },
         ),
 
@@ -144,46 +146,50 @@ function setupData() {
         ),
 
         new TokenData(
-          "Square", "Replace your roll with 2 d6s whose values are squared.",
+          "Square", "Remove your dice, roll 2 D6, then square their values.",
           false, false, loadImage("Assets/Images/Tokens/Neutral/Common/Square.png"),
           function(params, callback) {
 
             // Empty dice then generate 2 d6. Square their value afterwards
             mainCanvas.screens[GAME].dice = [];
             mainCanvas.screens[GAME].generateDice(2, 6);
-            for (let i = 0; i < mainCanvas.screens[GAME].dice.length; i++)
-              mainCanvas.screens[GAME].dice[i].value = mainCanvas.screens[GAME].dice[i].value * mainCanvas.screens[GAME].dice[i].value;
+            for (let i = 0; i < mainCanvas.screens[GAME].dice.length; i++) {
+              let val = mainCanvas.screens[GAME].dice[i].value;
+              mainCanvas.screens[GAME].dice[i].value = val * val;
+            }
             callback(params);
-          }, function(params) {},
+          }, function(params) {}
         )
       ],
       "rare": [
         new TokenData(
-          "Interval", "For each dice become 3 * the interval (Minimum 1) between it and the next dice. This happens sequentially.",
-          false, false, function(params, callback) {
-            for (let i = 0; i < mainCanvas.screens[GAME].dice.length-1; i++) {
-              let val = abs(mainCanvas.screens[GAME].dice[i+1].value-mainCanvas.screens[GAME].dice[i].value);
-              val = val== 0 ? 1 : val;
-              mainCanvas.screens[GAME].dice[i].value = val * 3;
+          "Interval", "Each dice values get set to 3 * the interval (Minimum 1) between it and the next dice. This happens sequentially.",
+          false, false, loadImage("Assets/Images/Tokens/Neutral/Rare/Interval.png"),
+          function(params, callback) {
+
+            // For each dice set its value to the difference between it and the next with minimum of 1
+            for (let i = 0; i < mainCanvas.screens[GAME].dice.length - 1; i++) {
+              let val = abs(mainCanvas.screens[GAME].dice[i + 1].value - mainCanvas.screens[GAME].dice[i].value);
+              mainCanvas.screens[GAME].dice[i].value = max(1, val) * 3;
             }
             callback(params);
-          }, function(params) {},
-          loadImage("Assets/Images/Tokens/Neutral/Rare/Interval.png")
+          }, function(params) {}
         ),
 
         // new TokenData(
         //   "Joker", "Perform a random action of choice 6, onto a random player.",
-        //   true, false, function(params, callback) {
+        //   true, false, loadImage("Assets/Images/Tokens/Neutral/Rare/Joker.png"),
+        //   function(params, callback) {
         //     let r1 = floor(random(2));
         //     let r2 = floor(random(6));
         //     params.push(r1);
         //     params.push(r2);
         //     if (r1 == 0) {
         //       if (r2 == 0) {
-        //         mainCanvas.screens[GAME].scoreInfo.scoreLost += 25;
+        //         mainCanvas.screens[GAME].gameScoreUpdate(0, 25, 0);
         //         socket.emit("historySend", {"text": ("And lost 25 score"), "formatting": {}});
         //       } else if (r2 == 1) {
-        //         mainCanvas.screens[GAME].scoreInfo.scoreGained += 25;
+        //         mainCanvas.screens[GAME].gameScoreUpdate(25, 0, 0);
         //         socket.emit("historySend", {"text": ("And gained 25 score"), "formatting": {}});
         //       } else if (r2 == 2) {
         //         mainCanvas.screens[GAME].tokens.pop();
@@ -198,10 +204,10 @@ function setupData() {
         //       }
         //     } else {
         //       if (r2 == 0) {
-        //         mainCanvas.screens[GAME].scoreInfo.scoreDealt += 25;
+        //         mainCanvas.screens[GAME].gameScoreUpdate(0, 0, 25);
         //         socket.emit("historySend", {"text": "And removed 25 score", "formatting": {}});
         //       } else if (r2 == 1) {
-        //         mainCanvas.screens[GAME].scoreInfo.scoreDealt -= 25;
+        //         mainCanvas.screens[GAME].gameScoreUpdate(0, 0, -25);
         //         socket.emit("historySend", {"text": ("And gave 25", "formatting": {}});
         //       } else if (r2 == 2) {
         //       socket.emit("historySend", {"text": ("And removed 2 tokens", "formatting": {}});
@@ -217,9 +223,9 @@ function setupData() {
         //   }, function(params) {
         //     if (params[1] == 1) {
         //       if (params[2] == 0) {
-        //         mainCanvas.screens[GAME].scoreInfo.scoreLost += 25;
+        //         mainCanvas.screens[GAME].gameScoreUpdate(0, 25, 0);
         //       } else if (params[2] == 1) {
-        //         mainCanvas.screens[GAME].scoreInfo.scoreGained += 25;
+        //         mainCanvas.screens[GAME].gameScoreUpdate(25, 0, 0);
         //       } else if (params[2] == 2) {
         //         mainCanvas.screens[GAME].tokens.pop();
         //         mainCanvas.screens[GAME].tokens.pop();
@@ -228,150 +234,182 @@ function setupData() {
         //       } else if (params[2] == 5) {
         //       }
         //     }
-        //   },
-        //   loadImage("Assets/Images/Tokens/Neutral/Rare/Joker.png")
+        //   }
         // ),
 
         new TokenData(
-          "Mitosis", "Empty your roll and roll a d10, if it's an even roll, split into 2 D10s and roll again, keep repeating cycle until there are no even rolls.",
-          false, false, function(params, callback) {
-            let toSplit = [];
+          "Mitosis", "Remove your dice and roll 2 D9s. repeatedly split any dice you own that are even into 2 D9s and reroll their value.",
+          false, false, loadImage("Assets/Images/Tokens/Neutral/Rare/Mitosis.png"),
+          function(params, callback) {
             let splitCount = 0;
-            mainCanvas.screens[GAME].dice = [new GameShowDice(9, 0), new GameShowDice(9, 1)];
-            toSplit.push(mainCanvas.screens[GAME].dice[0]);
-            toSplit.push(mainCanvas.screens[GAME].dice[1]);
+
+            // Remove dice and roll 2 d9s which are to be split
+            mainCanvas.screens[GAME].dice = [];
+            mainCanvas.screens[GAME].dice.push(new GameShowDice(mainCanvas, 9));
+            mainCanvas.screens[GAME].dice.push(new GameShowDice(mainCanvas, 9));
             mainCanvas.screens[GAME].updateDicePositions();
+
+            // Recursive function to split all dice
             let trySplit = function() {
-              if (toSplit[0].value%2 == 0) {
-                splitCount++;
-                socket.emit("historySend", {"text": ("Split! ("+mainCanvas.screens[GAME].getRoll()+", " + mainCanvas.screens[GAME].playerName+")"), "formatting": {}});
-                let nd1 = new GameShowDice(9, 0);
-                let nd2 = new GameShowDice(9, 0);
-                mainCanvas.screens[GAME].dice.push(nd1);
-                mainCanvas.screens[GAME].dice.push(nd2);
-                toSplit.push(nd1);
-                toSplit.push(nd2);
-                mainCanvas.screens[GAME].dice.splice(mainCanvas.screens[GAME].dice.indexOf(toSplit[0]), 1);
-                mainCanvas.screens[GAME].updateDicePositions();
+              let i = 0;
+              let split = false;
+              while (i < mainCanvas.screens[GAME].dice.length) {
+                if (mainCanvas.screens[GAME].dice[i].value % 2 == 0) {
+                  splitCount++;
+                  mainCanvas.screens[GAME].dice.push(new GameShowDice(mainCanvas, 9));
+                  mainCanvas.screens[GAME].dice.push(new GameShowDice(mainCanvas, 9));
+                  mainCanvas.screens[GAME].dice.splice(i, 1);
+                  mainCanvas.screens[GAME].updateDicePositions();
+                  socket.emit("historySend", {"text": (
+                    "Split! (" + mainCanvas.screens[GAME].getRoll()
+                    + ", " + mainCanvas.screens[GAME].playerName
+                    + ", " + splitCount + ")"
+                  ), "formatting": {}});
+                  split = true;
+                  break;
+                }
               }
-              toSplit.splice(0, 1);
-              if (toSplit.length > 0) {setTimeout(trySplit, toSplit[0].value%2==0?500:0);
-              } else {setTimeout(callback(params), 2000)}
-            }
-            let timer = toSplit[0].value%2==0?500:0;
-            setTimeout(trySplit(), timer);
-          }, function(params) {},
-          loadImage("Assets/Images/Tokens/Neutral/Rare/Mitosis.png")
+
+              // Split again or callback with params
+              if (split) setTimeout(trySplit, 500);
+              else setTimeout(callback(params), 2000);
+            }; trySplit();
+          }, function(params) {}
         ),
 
 
         new TokenData(
-          "Ten Ten", "Roll a d10, and then set your roll to that many 10 valued d10s.",
-          false, false, function(params, callback) {
+          "Ten Ten", "Roll a D10, Remove your dice and add X D10s with value 10, where X is the original dice's value.",
+          false, false, loadImage("Assets/Images/Tokens/Neutral/Rare/TenTen.png"),
+          function(params, callback) {
+
+            // Set dice to 'amount' D10s with value 10
+            let amount = floor(random(10)) + 1;
             mainCanvas.screens[GAME].dice = [];
-            let amount = floor(random(10))+1;
-            for (let i = 0; i < amount; i++) {
-              mainCanvas.screens[GAME].dice.push(new GameShowDice(10, i));
-            }
+            for (let i = 0; i < amount; i++)
+              mainCanvas.screens[GAME].dice.push(new GameShowDice(mainCanvas, 10));
+            mainCanvas.screens[GAME].updateDicePositions();
             callback(params);
-          }, function(params) {},
-          loadImage("Assets/Images/Tokens/Neutral/Rare/TenTen.png")
+          }, function(params) {}
         ),
 
         new TokenData(
           "Dead Mans Hand", "Reroll your tokens.",
-          false, true, function(params, callback) {
-            for (let i = 0; i < mainCanvas.screens[GAME].tokens.length; i++) {
-              if (mainCanvas.screens[GAME].tokens[i] != params[1]) {
-                mainCanvas.screens[GAME].tokens[i].animateOffscreen([], function(params) {});
-              }
-            }
-            mainCanvas.screens[GAME].generateTokens(5);
+          false, true, loadImage("Assets/Images/Tokens/Neutral/Rare/DeadMansHand.png"),
+          function(params, callback) {
+
+            // Animate all tokens offscreen apart from token that called this action
+            // The token that called this action will be animated offscreen in the callback
+            let count = mainCanvas.screens[GAME].tokens.length;
+            for (let i = 0; i < count; i++) {
+              params.preventAnimation = true;
+              mainCanvas.screens[GAME].tokens[i].animateOffscreen({}, function(params) {});
+            } mainCanvas.screens[GAME].generateTokens(count);
             callback(params);
-          }, function(params) {},
-          loadImage("Assets/Images/Tokens/Neutral/Rare/DeadMansHand.png")
+          }, function(params) {}
         ),
 
         new TokenData(
           "Quartic", "Set the size of your first 4 dice to the square of their value, and reroll them.",
-          false, false, function(params, callback) {
+          false, false, loadImage("Assets/Images/Tokens/Neutral/Rare/Quartic.png"),
+          function(params, callback) {
+
+            // Set first 4 or less dices size to square of their value and reroll
             for (let i = 0; i < min(4, mainCanvas.screens[GAME].dice.length); i++) {
               mainCanvas.screens[GAME].dice[i].diceSize = Math.pow(mainCanvas.screens[GAME].dice[i].value, 2);
               mainCanvas.screens[GAME].dice[i].reroll();
             }
             callback(params);
-          }, function(params) {},
-          loadImage("Assets/Images/Tokens/Neutral/Rare/Quartic.png")
+          }, function(params) {}
         ),
 
         new TokenData(
-          "Pacify", "Block all incoming damage this turn. After 2 turns wilts into thorns.",
-          false, false, function(params, callback) {
+          "Pacify", "Block all incoming damage this turn. After 2 turns wilts into thorns.", // TODO custom description
+          false, false, loadImage("Assets/Images/Tokens/Neutral/Rare/Pacify.png"),
+          function(params, callback) {
+
+            // Set blockDamage to true
             mainCanvas.screens[GAME].extraInfo.blockDamage = true;
             callback(params);
-          }, function(params) {},
-          loadImage("Assets/Images/Tokens/Neutral/Rare/Pacify.png")
+          }, function(params) {}
         )
       ],
       "legendary": [
         new TokenData(
-          "Big Bertha", "Roll a d150, set this to your roll and deal 50% to the enemies score.",
-          true, false, function(params, callback) {
-            mainCanvas.screens[GAME].dice = [new GameShowDice(150, 0)];
+          "Big Bertha", "Roll a D200, set this to your roll and deal 50% to the enemies score.",
+          true, false, loadImage("Assets/Images/Tokens/Neutral/Legendary/BigBertha.png"),
+          function(params, callback) {
+
+            // Set dices to a single D200
+            mainCanvas.screens[GAME].dice = [new GameShowDice(mainCanvas, 200)];
+            mainCanvas.screens[GAME].updateDicePositions();
+
+            // Deal damage to the enemy equal to half the score of the D200
             let damage = mainCanvas.screens[GAME].dice[0].value * 0.5;
-            params.push(damage);
-            mainCanvas.screens[GAME].scoreInfo.scoreDealt += damage;
+            params.damage = dmaage;
+            mainCanvas.screens[GAME].gameScoreUpdate(0, 0, damage);
             socket.emit("historySend", {"text": ("And dealt " + fancyFormat(damage, 2)), "formatting": {}});
             callback(params);
-          }, function(params) {mainCanvas.screens[GAME].scoreInfo.scoreLost += params[1]},
-          loadImage("Assets/Images/Tokens/Neutral/Legendary/BigBertha.png"), null
+          }, function(params) {
+
+            // Take damage
+            mainCanvas.screens[GAME].gameScoreUpdate(0, params.damage, 0);
+          }
         ),
 
         new TokenData(
           "50/50", "50% chance to gain 50% of your score, 50% chance to lose 50% of your score.",
-          false, false, function(params, callback) {
+          false, false, loadImage("Assets/Images/Tokens/Neutral/Legendary/FiftyFifty.png"),
+          function(params, callback) {
+
+            // Gain 50% score
             if (random() < 0.5) {
-              mainCanvas.screens[GAME].scoreInfo.scoreGained += mainCanvas.screens[GAME].scoreInfo.score/2;
+              mainCanvas.screens[GAME].gameScoreUpdate(mainCanvas.screens[GAME].scoreInfo.score * 0.5, 0, 0);
               socket.emit("historySend", {"text": ("And gained 50% score"), "formatting": {}});
+
+            // Lose 50% score
             } else {
-              mainCanvas.screens[GAME].scoreInfo.scoreLost += mainCanvas.screens[GAME].scoreInfo.score/2;
+              mainCanvas.screens[GAME].gameScoreUpdate(0, mainCanvas.screens[GAME].scoreInfo.score * 0.5, 0);
               socket.emit("historySend", {"text": ("And lost 50% score"), "formatting": {}});
             }
             callback(params);
-          }, function(params) {},
-          loadImage("Assets/Images/Tokens/Neutral/Legendary/FiftyFifty.png")
+          }, function(params) {}
         ),
 
-        // new TokenData(
-        //   "Gamble", "50% chance to take half of enemies score. 50% chance the enemy half takes of yours.",
-        //   true, false, function(params, callback) {
-        //     params.push("outbound");
-        //     if (random() < 0.5) { // Give 50% to enemy
-        //       params.push("give");
-        //       params.push(mainCanvas.screens[GAME].scoreInfo.score * 0.5);
-        //       mainCanvas.screens[GAME].scoreInfo.scoreLost += mainCanvas.screens[GAME].scoreInfo.score * 0.5;
-        //       socket.emit("historySend", {"text": ("and gave 50% score!"), "formatting": {}});
-        //     } else {
-        //       params.push("take");
-        //     }
-        //     callback(params);
-        //   }, function(params) {
-        //     if (params[1] == "outbound") {
-        //       if (params[2] == "give") {
-        //         mainCanvas.screens[GAME].scoreInfo.scoreGained += params[3];
-        //       } else {
-        //         socket.emit("gameTokenUsed", {"name": "Gamble", "params": {"showToken": params.showToken, "inbound", mainCanvas.screens[GAME].scoreInfo.score * 0.5}});
-        //         mainCanvas.screens[GAME].scoreInfo.scoreLost += mainCanvas.screens[GAME].scoreInfo.score * 0.5;
-        //       }
-        //
-        //     } else {
-        //       mainCanvas.screens[GAME].scoreInfo.scoreGained += params[2];
-        //       mainCanvas.screens[GAME].scoreInfo.scoreDealt += params[2];
-        //       socket.emit("historySend", {"text": ("and took 50% score!"), "formatting": {}});
-        //     }
-        //   },
-        //   loadImage("Assets/Images/Tokens/Neutral/Legendary/Gamble.png")
-        // )
+        new TokenData(
+          "Gamble", "50% chance to take half of enemies score. 50% chance the enemy half takes of yours.",
+          true, false, loadImage("Assets/Images/Tokens/Neutral/Legendary/Gamble.png"),
+          function(params, callback) {
+            params.direction = "outbound";
+
+            // Give 50% to enemy
+            if (random() < 0.5) {
+              params.amount = mainCanvas.screens[GAME].scoreInfo.score * 0.5;
+              mainCanvas.screens[GAME].gameScoreUpdate(0, params.amount, 0);
+              socket.emit("historySend", {"text": ("and gave 50% score!"), "formatting": {}});
+            } else params.amount = null;
+            callback(params);
+          }, function(params) {
+
+            // Receive 50% from enemy
+            if (params.direction == "outbound") {
+              if (params.amount != null) mainCanvas.screens[GAME].gameScoreUpdate(params.amount, 0, 0);
+
+              // 50% stolen by enemy
+              else {
+                params.durection = "inboud";
+                params.amount = mainCanvas.screens[GAME].scoreInfo.score * 0.5;
+                socket.emit("gameTokenUsed", params);
+                mainCanvas.screens[GAME].gameScoreUpdate(0, mainCanvas.screens[GAME].scoreInfo.score * 0.5, 0);
+              }
+
+            // Stolen 50% from enemy
+            } else {
+              mainCanvas.screens[GAME].gameScoreUpdate(params.amount, 0, params.amount);
+              socket.emit("historySend", {"text": ("and took 50% score!"), "formatting": {}});
+            }
+          }
+        )
       ],
     },
 
@@ -381,8 +419,9 @@ function setupData() {
           new TokenData(
             "Blank", "When used sets itself, and any others, to token your topmost non Blank token.",
             false, true, loadImage("Assets/Images/Tokens/Class/OneTrick/Blank.png"),
-
             function(params, callback) {
+
+              // Find first non "Blank" token
               let replaceToken = null;
               for (let i = 0; i < mainCanvas.screens[GAME].tokens.length; i++) {
                 if (mainCanvas.screens[GAME].tokens[i].token.name != "Blank") {
@@ -390,14 +429,16 @@ function setupData() {
                   break;
                 }
               }
+
+              // If there is a token to replace others with then replace
               if (replaceToken != null) {
+                params.preventAnimation = true;
+                params.showToken.used = false;
                 for (let i = 0; i < mainCanvas.screens[GAME].tokens.length; i++) {
-                  if (mainCanvas.screens[GAME].tokens[i] != params[1] && mainCanvas.screens[GAME].tokens[i].token.name == "Blank") {
+                  if (mainCanvas.screens[GAME].tokens[i].token.name == "Blank") {
                     mainCanvas.screens[GAME].tokens[i].token = replaceToken.token;
                   }
                 }
-                mainCanvas.screens[GAME].generateTokens(1);
-                mainCanvas.screens[GAME].tokens[mainCanvas.screens[GAME].tokens.length-1].token = replaceToken.token;
               }
               callback(params);
             }, function(params) {},
@@ -412,15 +453,17 @@ function setupData() {
           new TokenData(
             "Drumstick", "Deal 20 to their score, heal 20 to your score.",
             true, true, loadImage("Assets/Images/Tokens/Class/Ogre/Drumstick.png"),
-
             function(params, callback) {
-              mainCanvas.screens[GAME].scoreInfo.scoreGained += 20;
-              mainCanvas.screens[GAME].scoreInfo.scoreDealt += 20;
+
+              // Gain 20 score, deal 20 score
+              mainCanvas.screens[GAME].gameScoreUpdate(20, 0, 20);
               socket.emit("historySend", {"text":("And gained 20 score"), "formatting":{}});
               socket.emit("historySend", {"text":("And dealt 20 score"), "formatting":{}});
               callback(params);
             }, function(params) {
-              mainCanvas.screens[GAME].scoreInfo.scoreLost += 20;
+
+              // Lose 20 score
+              mainCanvas.screens[GAME].gameScoreUpdate(0, 20, 0);
             },
           )
         ],
@@ -431,33 +474,41 @@ function setupData() {
       "sniper": {
         "common": [
           new TokenData(
-            "Iris", "This is a token",
+            "Iris", "This is a token", // TODO
             false, true, loadImage("Assets/Images/Tokens/Class/Sniper/Iris.png"),
             function(params, callback) {callback(params);}, function(params) {},
           )
         ],
         "rare": [
           new TokenData(
-            "Precision", "Uses 75% stored power to deal 100% stored power to the enemy, with a 25% of critical hit, which multiplies output by 4x but uses all stored power.",
+            "Precision", "Uses 75% stored power to deal 100% stored power to the enemy, with a 25% of critical hit which deals 400% but uses 100%.",
             true, false, loadImage("Assets/Images/Tokens/Class/Sniper/Precision.png"),
-
             function(params, callback) {
+
+              // Deal damage based on sniper stored damage
               let damage = mainCanvas.screens[GAME].extraInfo.sniperStoredDamage;
               let r1 = random();
+
+              // Critical hit: use 100% deal 400%
               if (r1 < 0.25) {
                 damage *= 4;
                 mainCanvas.screens[GAME].extraInfo.sniperStoredDamage = 0;
                 socket.emit("historySend", {"text": ("And dealt " + damage + " with a critical hit!"), "formatting":{}});
+
+                // Normal hit use 75% deal 100%
               } else {
                 mainCanvas.screens[GAME].extraInfo.sniperStoredDamage *= 0.25;
                 socket.emit("historySend", {"text": ("And dealt " + damage), "formatting":{}});
               }
-              mainCanvas.screens[GAME].scoreInfo.scoreDealt += damage;
-              params.push(damage);
-              callback(params);
 
+              // Deal damage
+              mainCanvas.screens[GAME].gameScoreUpdate(0, 0, damage);
+              params.damage = damage;
+              callback(params);
             }, function(params) {
-              mainCanvas.screens[GAME].scoreInfo.scoreLost += params[1];
+
+              // Take damage
+              mainCanvas.screens[GAME].gameScoreUpdate(0, params.damage, 0);
             },
           )
         ],
@@ -467,7 +518,7 @@ function setupData() {
       "theif": {
         "common": [
           new TokenData(
-            "Conspire", "This is a token",
+            "Conspire", "This is a token", // TODO
             false, false, loadImage("Assets/Images/Tokens/Class/Thief/Conspire.png"),
             function(params, callback) {callback(params);}, function(params) {},
           )
@@ -486,7 +537,7 @@ function setupData() {
 
               // Lose 10% score
               let scoreLost = mainCanvas.screens[GAME].scoreInfo.score * 0.1;
-              mainCanvas.screens[GAME].scoreInfo.scoreLost += scoreLost;
+              mainCanvas.screens[GAME].gameScoreUpdate(0, scoreLost, 0);
               socket.emit("historySend", {"text": ("To sacrifice " + fancyFormat(damage, 2)), "formatting": {}});
               params.direction = "outbound";
               callback(params);
@@ -495,15 +546,14 @@ function setupData() {
               // Give 20% score
               if (params.direction == "outbound") {
                 let scoreSapped = mainCanvas.screens[GAME].scoreInfo.score * 0.2;
-                mainCanvas.screens[GAME].scoreInfo.scoreLost += scoreSapped;
+                mainCanvas.screens[GAME].gameScoreUpdate(0, scoreSapped, 0);
                 params.direction = "inbound";
                 params.scoreSapped = scoreSapped;
                 socket.emit("gameTokenUsed", params);
 
               // Gain 20% of enemy score
               } else if (params.direction == "inbound") {
-                mainCanvas.screens[GAME].scoreInfo.scoreGained += params.scoreSapped;
-                mainCanvas.screens[GAME].scoreInfo.scoreDealt += params.scoreSapped;
+                mainCanvas.screens[GAME].gameScoreUpdate(params.scoreSapped, 0, params.scoreSapped);
                 socket.emit("historySend", {"text": ("And sapped " + fancyFormat(params[2], 2)), "formatting": {}});
               }
             },
@@ -519,9 +569,10 @@ function setupData() {
         false, false, loadImage("Assets/Images/Tokens/Unobtainable/Thorns.png"),
         function(params, callback) {
 
-          mainCanvas.screens[GAME].scoreInfo.scoreLost += 15;
+          // Lose 15 score
+          mainCanvas.screens[GAME].gameScoreUpdate(0, 15, 0);
           callback(params);
-        }, function(params) {},
+        }, function(params) {}
       )
     ]
   }
@@ -561,6 +612,11 @@ function setupData() {
     new ClassData(
       "c2",
       "This is the description for c2",
+      function() {return "";}
+    ),
+    new ClassData(
+      "c3",
+      "This is the description for c3",
       function() {return "";}
     )
   ];

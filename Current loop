@@ -1,0 +1,87 @@
+
+
+//    TODO
+// Move client connnection code to mainCanvas
+// Update how locked in works
+// Update all instances of gameScoreUpdateSend
+// Clean up where score updates are sent
+// Finish mapping game loop
+
+
+
+
+//    MAIN GAME LOOP FOR CONNECTING
+
+- mainCanvas.changeToScreen(CONNECT) is called
+- screen changed to connecting screen
+- gameConnectRequest is sent to the server
+
+- the server figures out whether user is
+  accepted.
+
+  - server if accepted:
+    - gameConnectResponse {"accepted": true,
+      "playerNum": 0 or 1}
+    - add players socket to list
+    - call gameStart() on server if 2 people
+
+  - server if denied:
+    - gameConnectResponse {"accepted": false,
+      "playerNum": -1}
+
+- on receiving the connectResponse
+
+  - client if accepted:
+    - mainCanvas.changeToScreen(GAME) with
+      player num
+
+  - client if denied:
+    - mainCanvas.changeToScreen(MENU, "text":
+    "could not connect", "time": 60}
+
+- on changing to gameScreen
+- change gameScreen class to menuScreen class
+
+
+- on gameStart on server
+- reset variables
+- send gameStart to both clients
+- gameScreen.gameStart called
+- resetVariables, generate tokens and dice
+
+
+
+
+//    MAIN GAME LOOP FOR PLAYING
+
+||update score|| update local and foreign copies of score
+
+//lock turn// lock the turn variable
+//officially lock turn// send turn lock to server
+
+- when using a showToken
+- decide whether it will complete turn
+- this factors in partial tokens and extraToken
+- lock the token and //lock turn// if complete
+
+- use the tokens action with callback
+- pass in complete, token and showToken
+- the action can affect params
+- the action can use ||update score||
+
+  - callback will call animateOffscreen
+  - pass in previous params and another callback
+
+    - callback will //officially lock turn//
+    - callback will ||update score||
+
+  - if token affects enemy tell enemy to call
+    foreign action for token
+  - dont pass showToken over as it breaks
+
+    - gameScreen receives foreign token request
+    - calls the foreignAction for the token
+    - this action can affect params
+    - this action can use ||update score||
+    - pass in params from network
+    - ||update score||
