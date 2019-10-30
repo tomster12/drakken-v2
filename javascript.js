@@ -12,7 +12,6 @@
 
 
 //         TODO
-
 // Check over entire game communication loop
 // Sort out entire game socket communication and logic
 //   refactor code to work optimally
@@ -22,7 +21,7 @@
 
 // change all elements on gameScreen to be stored in an Object
 //   each with update functions
-// Add custom descriptions for tokens using '|' with a list of tokens
+// Add custom descriptions for tokens using '|' with a list of functions
 
 // Finish cleaning up and implementing the game screen
 // Once game logic is working and written to high standard

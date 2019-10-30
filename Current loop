@@ -16,6 +16,7 @@
 - screen changed to connecting screen
 - gameConnectRequest is sent to the server
 
+
 - the server figures out whether user is
   accepted.
 
@@ -29,15 +30,16 @@
     - gameConnectResponse {"accepted": false,
       "playerNum": -1}
 
+
 - on receiving the connectResponse
 
   - client if accepted:
-    - mainCanvas.changeToScreen(GAME) with
-      player num
+    - mainCanvas.changeToScreen(GAME, player num)
 
   - client if denied:
-    - mainCanvas.changeToScreen(MENU, "text":
+    - mainCanvas.changeToScreen(MENU, {"text":
     "could not connect", "time": 60}
+
 
 - on changing to gameScreen
 - change gameScreen class to menuScreen class
