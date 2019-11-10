@@ -25,7 +25,6 @@
       "playerNum": 0 or 1}
     - add players socket to list
     - call gameStart() on server if 2 people
-
   - server if denied:
     - gameConnectResponse {"accepted": false,
       "playerNum": -1}
@@ -35,7 +34,6 @@
 
   - client if accepted:
     - mainCanvas.changeToScreen(GAME, player num)
-
   - client if denied:
     - mainCanvas.changeToScreen(MENU, {"text":
     "could not connect", "time": 60}
@@ -56,26 +54,21 @@
 
 //    MAIN GAME LOOP FOR PLAYING
 
-||update score|| update local and foreign copies of score
-
 //lock turn// lock the turn variable
 //officially lock turn// send turn lock to server
 
 - when using a showToken
 - decide whether it will complete turn
 - this factors in partial tokens and extraToken
-- lock the token and //lock turn// if complete
+- //lock turn// if to complete
 
 - use the tokens action with callback
-- pass in complete, token and showToken
+- pass in {complete, token and showToken}
 - the action can affect params
-- the action can use ||update score||
 
   - callback will call animateOffscreen
   - pass in previous params and another callback
-
-    - callback will //officially lock turn//
-    - callback will ||update score||
+    - callback will //officially lock turn// if necessary
 
   - if token affects enemy tell enemy to call
     foreign action for token
@@ -84,6 +77,4 @@
     - gameScreen receives foreign token request
     - calls the foreignAction for the token
     - this action can affect params
-    - this action can use ||update score||
     - pass in params from network
-    - ||update score||
